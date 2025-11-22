@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Analysis - Connect Four</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='tree.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <h1>AI Search Analysis</h1>
+    <p>Explore the minimax search tree with interactive visualization. See how the AI evaluates each possible move.</p>
+    <p><a href="{{ url_for('play') }}">← Back to game</a></p>
+    
+    <!-- Board State Section -->
+    <div class="panel" style="margin-bottom: 20px;">
+      <h2>Board State</h2>
+      <div class="board-small">
+        {% for r in range(board|length) %}
+          {% for c in cols %}
+            {% set cell = board[r][c] %}
+            {% set color = '' %}
+            {% if cell == 1 %}{% set color = 'human' %}{% elif cell == 2 %}{% set color = 'ai' %}{% endif %}
+            <div class="cell-small"><div class="disc-small {{ color }}"></div></div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+
+      {% if diag %}
+      <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div>
+          <h3>Search Metrics</h3>
+          <div class="metrics">
+            <div class="metric-item">
+              <span class="metric-label">Search Depth:</span>
+              <span class="metric-value">{{ diag.search_depth }} ply</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Duration:</span>
+              <span class="metric-value">{{ '%.3f'|format(diag.duration_s) }}s</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Nodes Expanded:</span>
+              <span class="metric-value">{{ diag.nodes_expanded }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3>Root Move Evaluations</h3>
+          <div class="move-list">
+            {% for move in diag.evaluated_moves %}
+              <div class="move-item">
+                <span class="move-col">Column {{ move.column }}</span>
+                <span class="move-score" data-score="{{ move.score }}">Score: {{ move.score }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <h3>Legend</h3>
+        <div class="tree-legend">
+          <div class="legend-item">
+            <span class="legend-box ai-node"></span>
+            <span>AI Move (Maximizing)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-box human-node"></span>
+            <span>Human Move (Minimizing)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-box best-path"></span>
+            <span>Principal Variation (Best Line)</span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Search Tree Section -->
+    <div class="panel tree-panel">
+      <h2>Minimax Search Tree</h2>
+      {% if diag %}
+        <div class="tree-controls">
+          <label>
+            <input type="checkbox" id="showBestOnly" checked /> Show Best Path Only
+          </label>
+          <label>
+            <input type="checkbox" id="showScores" checked /> Show Scores
+          </label>
+          <label>
+            <input type="checkbox" id="highlightBest" checked /> Highlight Best Path
+          </label>
+        </div>
+        <div id="treeContainer"></div>
+      {% else %}
+        <p class="subtitle">No search tree available. Play a move first to see the AI's decision tree.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if diag %}
+  <script>
+    const treeData = {{ diag.search_tree|tojson|safe }};
+    const principalVariation = {{ diag.principal_variation|tojson|safe }};
+    const evaluatedMovesData = {{ diag.evaluated_moves|tojson|safe }};
+  </script>
+  <script src="{{ url_for('static', filename='tree.js') }}"></script>
+  {% endif %}
+</body>
+</html>

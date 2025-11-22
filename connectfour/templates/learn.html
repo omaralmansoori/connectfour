@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learn Minimax - Connect Four</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .learn-content {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .concept-section {
+      margin-bottom: 40px;
+    }
+    .concept-section h2 {
+      color: var(--accent);
+      margin-bottom: 16px;
+      font-size: 28px;
+    }
+    .concept-section h3 {
+      color: var(--text);
+      margin: 20px 0 12px;
+      font-size: 20px;
+    }
+    .concept-section p {
+      line-height: 1.8;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .example-box {
+      background: rgba(93, 208, 255, 0.05);
+      border: 1px solid rgba(93, 208, 255, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+    .example-box strong {
+      color: var(--accent);
+    }
+    .code-snippet {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+    .highlight {
+      background: rgba(255, 209, 102, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--ai);
+    }
+    .algorithm-steps {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 4px solid var(--accent);
+      padding: 16px 20px;
+      margin: 16px 0;
+    }
+    .algorithm-steps ol {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+    .algorithm-steps li {
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+    .visual-demo {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .demo-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+    .demo-card .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .demo-card .value {
+      color: var(--text);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .nav-buttons {
+      display: flex;
+      gap: 12px;
+      margin: 32px 0;
+      flex-wrap: wrap;
+    }
+    .key-point {
+      background: rgba(255, 179, 71, 0.08);
+      border-left: 4px solid var(--accent-2);
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 4px;
+    }
+    .key-point strong {
+      color: var(--accent-2);
+    }
+  </style>
+</head>
+<body>
+  <div class="page learn-content">
+    <h1>🎓 Learn Minimax Algorithm</h1>
+    <p class="subtitle">Understanding how AI makes decisions in adversarial games</p>
+    
+    <div class="nav-buttons">
+      <a href="{{ url_for('play') }}" class="btn secondary">← Back to Game</a>
+      <a href="{{ url_for('analysis') }}" class="btn secondary">🔍 View AI Analysis</a>
+    </div>
+
+    <div class="concept-section">
+      <h2>What is Minimax?</h2>
+      <p>
+        The <span class="highlight">Minimax algorithm</span> is a decision-making strategy used in two-player, 
+        turn-based games where one player tries to maximize their advantage while the other tries to minimize it. 
+        The algorithm "thinks ahead" by exploring possible future moves and counter-moves.
+      </p>
+      
+      <div class="key-point">
+        <strong>Key Insight:</strong> In Connect Four, the AI assumes the human player will always make the best possible move. 
+        By considering all possible responses, the AI can choose the move that gives it the best outcome even against perfect play.
+      </div>
+
+      <div class="visual-demo">
+        <div class="demo-card">
+          <div class="label">Maximizer</div>
+          <div class="value">🤖 AI Player</div>
+          <p style="font-size: 12px; color: var(--muted); margin-top: 8px;">Tries to get the highest score</p>
+        </div>
+        <div class="demo-card">
+          <div class="label">Minimizer</div>
+          <div class="value">👤 Human Player</div>
+          <p style="font-size: 12px; color: var(--muted); margin-top: 8px;">Tries to get the lowest score</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="concept-section">
+      <h2>How Does It Work?</h2>
+      <p>
+        The minimax algorithm builds a <span class="highlight">search tree</span> of possible game states. 
+        Each node in the tree represents a board position, and edges represent moves.
+      </p>
+
+      <div class="algorithm-steps">
+        <h3>The Minimax Process:</h3>
+        <ol>
+          <li><strong>Start from current position:</strong> The root node represents the current game state.</li>
+          <li><strong>Generate possible moves:</strong> For each valid column, simulate dropping a piece.</li>
+          <li><strong>Recursively explore:</strong> For each move, imagine the opponent's best response, then your best counter-response, and so on.</li>
+          <li><strong>Evaluate leaf nodes:</strong> When you reach the search depth limit or a game-ending state, assign a score.</li>
+          <li><strong>Propagate scores upward:</strong> 
+            <ul>
+              <li>At maximizer nodes (AI), choose the move with the <strong>highest</strong> score</li>
+              <li>At minimizer nodes (Human), choose the move with the <strong>lowest</strong> score</li>
+            </ul>
+          </li>
+          <li><strong>Select best move:</strong> The AI chooses the move that leads to the best outcome.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="concept-section">
+      <h2>Scoring System</h2>
+      <p>
+        The AI evaluates positions using a <span class="highlight">heuristic function</span> that assigns numerical scores:
+      </p>
+
+      <div class="example-box">
+        <strong>Positive Scores:</strong> Favorable for the AI
+        <ul style="margin: 8px 0 0 20px;">
+          <li><strong>+1000:</strong> AI wins the game</li>
+          <li><strong>+10 to +50:</strong> AI has two or three pieces in a row with potential to connect four</li>
+        </ul>
+      </div>
+
+      <div class="example-box">
+        <strong>Negative Scores:</strong> Favorable for the Human
+        <ul style="margin: 8px 0 0 20px;">
+          <li><strong>-1000:</strong> Human wins the game</li>
+          <li><strong>-10 to -50:</strong> Human has two or three pieces in a row with potential to connect four</li>
+        </ul>
+      </div>
+
+      <div class="example-box">
+        <strong>Zero Score:</strong> Neutral position with no clear advantage
+      </div>
+    </div>
+
+    <div class="concept-section">
+      <h2>Alpha-Beta Pruning</h2>
+      <p>
+        Minimax can be slow because it explores many positions. <span class="highlight">Alpha-beta pruning</span> 
+        is an optimization that skips branches of the tree that won't affect the final decision.
+      </p>
+
+      <div class="key-point">
+        <strong>How it works:</strong> If we find a move that's worse than something we've already discovered, 
+        we can stop exploring that branch. This dramatically reduces the number of positions evaluated 
+        without changing the result.
+      </div>
+
+      <div class="visual-demo">
+        <div class="demo-card">
+          <div class="label">Without Pruning</div>
+          <div class="value">~5,000,000</div>
+          <p style="font-size: 12px; color: var(--muted); margin-top: 8px;">nodes at depth 6</p>
+        </div>
+        <div class="demo-card">
+          <div class="label">With Pruning</div>
+          <div class="value">~50,000</div>
+          <p style="font-size: 12px; color: var(--muted); margin-top: 8px;">nodes at depth 6</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="concept-section">
+      <h2>Search Depth</h2>
+      <p>
+        The <span class="highlight">search depth</span> determines how many moves ahead the AI looks. 
+        A deeper search makes the AI stronger but slower.
+      </p>
+
+      <div class="example-box">
+        <strong>Depth 2:</strong> AI looks 1 move ahead for itself, then 1 move for the opponent (fast, weak)
+      </div>
+      <div class="example-box">
+        <strong>Depth 4:</strong> AI plans 2 moves ahead for each player (balanced)
+      </div>
+      <div class="example-box">
+        <strong>Depth 6:</strong> AI plans 3 moves ahead for each player (slower, stronger)
+      </div>
+      <div class="example-box">
+        <strong>Depth 8:</strong> AI plans 4 moves ahead for each player (very slow, very strong)
+      </div>
+    </div>
+
+    <div class="concept-section">
+      <h2>Principal Variation</h2>
+      <p>
+        The <span class="highlight">principal variation (PV)</span> is the sequence of moves that the AI considers 
+        the best line of play if both players make optimal moves. In the diagnostics view, this is highlighted 
+        as the "best path."
+      </p>
+
+      <div class="key-point">
+        <strong>Example:</strong> If the principal variation is [3, 2, 4, 3], it means:
+        <ul style="margin: 8px 0 0 20px;">
+          <li>AI plays column 3</li>
+          <li>AI predicts human will play column 2</li>
+          <li>AI will then play column 4</li>
+          <li>AI predicts human will play column 3</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="concept-section">
+      <h2>Try It Yourself!</h2>
+      <p>
+        Now that you understand the concepts, try playing the game and viewing the diagnostics to see minimax in action:
+      </p>
+
+      <div class="nav-buttons">
+        <a href="{{ url_for('play') }}" class="btn">Play Connect Four</a>
+        <a href="{{ url_for('analysis') }}" class="btn secondary">🔍 View AI Analysis</a>
+      </div>
+
+      <div class="key-point">
+        <strong>Teaching Tip:</strong> Start with a low search depth (2-3) to see how the AI makes decisions quickly. 
+        Then increase the depth to see how it becomes more strategic. Compare the principal variations at different depths!
+      </div>
+    </div>
+
+    <div class="concept-section">
+      <h2>Further Learning</h2>
+      <p>The minimax algorithm is foundational in game AI and appears in many classic games:</p>
+      <ul style="line-height: 1.8; margin-left: 20px;">
+        <li>Chess engines use advanced minimax with deep search and complex evaluation functions</li>
+        <li>Checkers was "solved" using minimax, meaning perfect play is known</li>
+        <li>Tic-tac-toe is simple enough to search completely</li>
+        <li>Go uses variations of minimax combined with Monte Carlo Tree Search</li>
+      </ul>
+    </div>
+
+    <div style="margin: 40px 0; padding: 20px; background: rgba(93, 208, 255, 0.05); border-radius: 12px; text-align: center;">
+      <p style="margin: 0; color: var(--accent);">
+        Ready to explore? Head back to the game and watch the AI think!
+      </p>
+      <div class="nav-buttons" style="justify-content: center; margin-top: 16px;">
+        <a href="{{ url_for('play') }}" class="btn">Start Playing</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

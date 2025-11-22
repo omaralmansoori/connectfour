@@ -1,0 +1,109 @@
+#treeContainer {
+  min-height: 500px;
+  overflow-x: auto;
+  overflow-y: auto;
+  position: relative;
+  background: rgba(0,0,0,0.15);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.tree-node {
+  position: absolute;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 2px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.tree-node:hover {
+  transform: scale(1.05);
+  z-index: 100;
+}
+
+.tree-node.ai-turn {
+  background: rgba(255, 209, 102, 0.15);
+  border-color: rgba(255, 209, 102, 0.6);
+}
+
+.tree-node.human-turn {
+  background: rgba(255, 93, 115, 0.15);
+  border-color: rgba(255, 93, 115, 0.6);
+}
+
+.tree-node.best-path {
+  background: rgba(93, 208, 255, 0.2);
+  border-color: rgba(93, 208, 255, 0.9);
+  box-shadow: 0 0 20px rgba(93, 208, 255, 0.4);
+  border-width: 3px;
+}
+
+.tree-node.best-path.ai-turn {
+  background: rgba(255, 209, 102, 0.3);
+  border-color: var(--ai);
+}
+
+.tree-node.best-path.human-turn {
+  background: rgba(255, 93, 115, 0.3);
+  border-color: var(--human);
+}
+
+.node-label {
+  font-weight: 700;
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.node-info {
+  font-size: 11px;
+  color: var(--muted);
+  display: block;
+}
+
+.node-score {
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 4px;
+  display: block;
+}
+
+.tree-edge {
+  position: absolute;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.tree-edge line {
+  stroke: rgba(159, 177, 208, 0.3);
+  stroke-width: 2;
+  transition: all 0.2s ease;
+}
+
+.tree-edge.best-path line {
+  stroke: var(--accent);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px rgba(93, 208, 255, 0.6));
+}
+
+/* Tooltip for node details */
+.node-tooltip {
+  position: absolute;
+  background: rgba(18, 27, 47, 0.95);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1000;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.node-tooltip.visible {
+  display: block;
+}

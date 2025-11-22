@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Connect Four Coach</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <div class="top-bar">
+      <div>
+        <h1>Connect Four AI Coach</h1>
+        <p class="subtitle">A classroom-ready experience for exploring minimax search. Human moves first.</p>
+      </div>
+      <span class="badge">Learning Mode · Search tree + live board</span>
+    </div>
+
+    {% if message %}
+      <div class="status{% if game_over %} warning{% endif %}">{{ message }}</div>
+    {% endif %}
+
+    <div class="layout">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <h2>Game Board</h2>
+          <div class="legend">
+            <span><span class="token" style="background:var(--human)"></span>Human</span>
+            <span><span class="token" style="background:var(--ai)"></span>AI</span>
+          </div>
+        </div>
+        <div class="board">
+          {% for c in cols %}
+            <div class="column{% if game_over %} disabled{% endif %}" onclick="playMove({{ c }})">
+              {% for r in range(board|length) %}
+                {% set cell = board[r][c] %}
+                {% set color = '' %}
+                {% if cell == 1 %}{% set color = 'human' %}{% elif cell == 2 %}{% set color = 'ai' %}{% endif %}
+                {% set extra_class = '' %}
+                {% if last_ai_move and r == last_ai_move[0] and c == last_ai_move[1] %}{% set extra_class = ' last-move' %}{% endif %}
+                <div class="cell{{ extra_class }}">
+                  <div class="disc {{ color }}"></div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="controls">
+          <form id="moveForm" method="post" style="display:none;">
+            <input type="hidden" name="action" value="move" />
+            <input type="hidden" name="column" id="column" />
+          </form>
+          <a href="{{ url_for('reset') }}" class="btn secondary">Reset</a>
+          <a href="{{ url_for('analysis') }}" class="btn secondary">🔍 AI Analysis</a>
+          <a href="{{ url_for('learn') }}" class="btn secondary">📚 Learn Minimax</a>
+        </div>
+        {% if game_over %}
+          <div class="status warning">Game over. Reset to start a fresh match.</div>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <h2>AI Insights</h2>
+        <p class="subtitle">Visualize the minimax search tree alongside the live board. Use depth to tune difficulty.</p>
+        <div class="insight-grid">
+          <div class="stat">
+            <div class="label">Search depth</div>
+            <div class="value">{{ ai_depth }} ply</div>
+            <div class="pill">Higher depth → stronger but slower AI</div>
+          </div>
+          <div class="stat">
+            <div class="label">Nodes expanded</div>
+            <div class="value">{{ last_diag.nodes_expanded if last_diag else '—' }}</div>
+            <div class="pill">Each node represents a simulated future move</div>
+          </div>
+          <div class="stat">
+            <div class="label">Search time</div>
+            <div class="value">{% if last_diag %}{{ '%.3f'|format(last_diag.duration_s) }}s{% else %}—{% endif %}</div>
+            <div class="pill">Timing shows compute cost of deeper searches</div>
+          </div>
+        </div>
+
+        <div class="depth-form">
+          <form method="post">
+            <input type="hidden" name="action" value="set_depth" />
+            <label for="depth"><strong>AI depth</strong> (2-8):</label>
+            <input type="range" id="depth" name="depth" min="2" max="8" value="{{ ai_depth }}" oninput="depthValue.innerText=this.value" />
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+              <div>Current depth: <strong id="depthValue">{{ ai_depth }}</strong></div>
+              <button class="btn" type="submit">Update difficulty</button>
+            </div>
+            <p class="subtitle" style="margin-top:8px;">Depth controls how many moves ahead the AI searches. Higher values create tougher, more deliberate play.</p>
+          </form>
+        </div>
+
+        <div class="pill-row">
+          <span class="pill">Human always starts</span>
+          <span class="pill">Minimax with alpha-beta pruning</span>
+          <span class="pill">Real-time insights for teaching</span>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <h3 style="margin-bottom:6px;">Principal variation</h3>
+          {% if last_diag and last_diag.principal_variation %}
+            <div class="pv">
+              {% for step in last_diag.principal_variation %}
+                <span class="step">Column {{ step }}</span>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="subtitle">Play a move to see the AI's best planned sequence.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    function playMove(col) {
+      if ({{ 'true' if game_over else 'false' }}) return;
+      document.getElementById('column').value = col;
+      document.getElementById('moveForm').submit();
+    }
+  </script>
+</body>
+</html>
