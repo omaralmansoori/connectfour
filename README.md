@@ -48,15 +48,15 @@ Click a column to drop a disc. Use "New Game" to reset the board. Status message
 ### Flask Web App
 ```bash
 export FLASK_APP=connectfour.app:create_app
-flask run --host=0.0.0.0 --port=5000
+flask run --host=0.0.0.0 --port=8000
 ```
 Or run directly:
 ```bash
 python -m connectfour.app
 ```
-- Visit `http://localhost:5000/play` to use the web UI.
-- Visit `http://localhost:5000/diagnostics` to see the latest AI reasoning: evaluated moves, search depth, timing, and nodes expanded.
-- Use `http://localhost:5000/reset` to start a fresh game.
+- Visit `http://localhost:8000/play` to use the web UI.
+- Visit `http://localhost:8000/diagnostics` to see the latest AI reasoning: evaluated moves, search depth, timing, and nodes expanded.
+- Use `http://localhost:8000/reset` to start a fresh game.
 - Configure AI depth via `CONNECTFOUR_DEPTH` environment variable.
 
 ## Logging
