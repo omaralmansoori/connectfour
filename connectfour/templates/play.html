@@ -50,6 +50,10 @@
             <input type="hidden" name="action" value="move" />
             <input type="hidden" name="column" id="column" />
           </form>
+          <form method="post" style="display:inline; margin-right:8px;">
+            <input type="hidden" name="action" value="ai_start" />
+            <button class="btn secondary" type="submit">🤖 Let AI start</button>
+          </form>
           <a href="{{ url_for('reset') }}" class="btn secondary">Reset</a>
           <a href="{{ url_for('analysis') }}" class="btn secondary">🔍 AI Analysis</a>
           <a href="{{ url_for('learn') }}" class="btn secondary">📚 Learn Minimax</a>
