@@ -17,6 +17,7 @@ class ConnectFourGUI:
         self.config = config
         self.board = Board()
         self.ai = MinimaxAI(depth=config.ai_depth)
+        self.game_over = False
 
         self.root = tk.Tk()
         self.root.title("Connect Four")
@@ -40,10 +41,14 @@ class ConnectFourGUI:
 
     def reset(self) -> None:
         self.board.reset()
+        self.game_over = False
         self.status_var.set("Your turn")
         self.draw_board()
 
     def handle_click(self, event: tk.Event) -> None:
+        if self.game_over:
+            messagebox.showinfo("Game over", "Reset to play again")
+            return
         col = (event.x - self.PADDING) // self.CELL_SIZE
         if not self.board.is_valid_move(col):
             messagebox.showwarning("Invalid move", "Choose another column")
@@ -76,6 +81,7 @@ class ConnectFourGUI:
             self.status_var.set("Your turn")
 
     def finish_game(self, winner: Player | None) -> None:
+        self.game_over = True
         if winner is None:
             self.status_var.set("Draw!")
             messagebox.showinfo("Game over", "Draw!")
