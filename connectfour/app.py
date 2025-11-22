@@ -167,11 +167,20 @@ PLAY_TEMPLATE = """
       border-radius: 12px;
       padding: 12px;
       display: grid;
-      grid-template-columns: repeat({{ cols|length }}, 72px);
+      grid-template-columns: repeat({{ cols|length }}, 1fr);
       gap: 10px;
       justify-content: center;
       border: 1px solid #0d3c7b;
       box-shadow: inset 0 12px 30px rgba(0,0,0,0.35);
+    }
+    .column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .column.disabled {
+      cursor: not-allowed;
     }
     .cell {
       width: 72px;
@@ -264,27 +273,23 @@ PLAY_TEMPLATE = """
           </div>
         </div>
         <div class=\"board\">
-          {% for r in range(board|length) %}
-            {% for c in cols %}
-              {% set cell = board[r][c] %}
-              {% set color = '' %}
-              {% if cell == 1 %}{% set color = 'human' %}{% elif cell == 2 %}{% set color = 'ai' %}{% endif %}
-              <div class=\"cell\">
-                <div class=\"disc {{ color }}\"></div>
-              </div>
-            {% endfor %}
+          {% for c in cols %}
+            <div class=\"column{% if game_over %} disabled{% endif %}\" onclick=\"playMove({{ c }})\">
+              {% for r in range(board|length) %}
+                {% set cell = board[r][c] %}
+                {% set color = '' %}
+                {% if cell == 1 %}{% set color = 'human' %}{% elif cell == 2 %}{% set color = 'ai' %}{% endif %}
+                <div class=\"cell\">
+                  <div class=\"disc {{ color }}\"></div>
+                </div>
+              {% endfor %}
+            </div>
           {% endfor %}
         </div>
         <div class=\"controls\">
-          <form method=\"post\" class=\"controls\">
+          <form id=\"moveForm\" method=\"post\" style=\"display:none;\">
             <input type=\"hidden\" name=\"action\" value=\"move\" />
-            <label for=\"column\">Drop in column</label>
-            <select name=\"column\" id=\"column\" {% if game_over %}disabled{% endif %}>
-              {% for c in cols %}
-                <option value=\"{{ c }}\">{{ c }}</option>
-              {% endfor %}
-            </select>
-            <button class=\"btn\" type=\"submit\" {% if game_over %}disabled{% endif %}>Play move</button>
+            <input type=\"hidden\" name=\"column\" id=\"column\" />
           </form>
           <a href=\"{{ url_for('reset') }}\" class=\"btn secondary\">Reset</a>
           <a href=\"{{ url_for('diagnostics') }}\" class=\"btn secondary\">Diagnostics</a>
@@ -377,6 +382,13 @@ PLAY_TEMPLATE = """
       </div>
     </div>
   </div>
+  <script>
+    function playMove(col) {
+      if ({{ 'true' if game_over else 'false' }}) return;
+      document.getElementById('column').value = col;
+      document.getElementById('moveForm').submit();
+    }
+  </script>
 </body>
 </html>
 """
