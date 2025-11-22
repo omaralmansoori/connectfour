@@ -22,6 +22,17 @@ class SearchDiagnostics:
     search_depth: int
     duration_s: float
     nodes_expanded: int
+    search_tree: "SearchNode"
+    principal_variation: List[int]
+
+
+@dataclass
+class SearchNode:
+    column: Optional[int]
+    score: int
+    depth: int
+    maximizing: bool
+    children: List["SearchNode"]
 
 
 class MinimaxAI:
@@ -33,12 +44,28 @@ class MinimaxAI:
         evaluations: List[MoveEvaluation] = []
         nodes_expanded = 0
 
-        def minimax(state: Board, depth: int, maximizing: bool, alpha: float, beta: float) -> Tuple[int, Optional[int]]:
+        def minimax(
+            state: Board,
+            depth: int,
+            maximizing: bool,
+            alpha: float,
+            beta: float,
+            move_from_parent: Optional[int] = None,
+        ) -> Tuple[int, Optional[int], SearchNode]:
             nonlocal nodes_expanded
             nodes_expanded += 1
             game_over, winner = state.game_over()
+            node = SearchNode(
+                column=move_from_parent,
+                score=0,
+                depth=self.depth - depth,
+                maximizing=maximizing,
+                children=[],
+            )
             if depth == 0 or game_over:
-                return self.evaluate_board(state, player), None
+                eval_score = self.evaluate_board(state, player)
+                node.score = eval_score
+                return eval_score, None, node
 
             valid = state.valid_moves()
             if maximizing:
@@ -47,7 +74,10 @@ class MinimaxAI:
                 for col in valid:
                     child = state.clone()
                     child.drop_piece(col, player)
-                    score, _ = minimax(child, depth - 1, False, alpha, beta)
+                    score, _, child_node = minimax(
+                        child, depth - 1, False, alpha, beta, move_from_parent=col
+                    )
+                    node.children.append(child_node)
                     if depth == self.depth:
                         evaluations.append(MoveEvaluation(column=col, score=score))
                     if score > value:
@@ -56,7 +86,8 @@ class MinimaxAI:
                     alpha = max(alpha, value)
                     if alpha >= beta:
                         break
-                return int(value), best_move
+                node.score = int(value)
+                return int(value), best_move, node
             else:
                 value = float("inf")
                 best_move = None
@@ -64,25 +95,58 @@ class MinimaxAI:
                 for col in valid:
                     child = state.clone()
                     child.drop_piece(col, opp)
-                    score, _ = minimax(child, depth - 1, True, alpha, beta)
+                    score, _, child_node = minimax(
+                        child, depth - 1, True, alpha, beta, move_from_parent=col
+                    )
+                    node.children.append(child_node)
                     if score < value:
                         value = score
                         best_move = col
                     beta = min(beta, value)
                     if alpha >= beta:
                         break
-                return int(value), best_move
+                node.score = int(value)
+                return int(value), best_move, node
 
-        score, move = minimax(board, self.depth, True, -float("inf"), float("inf"))
+        score, move, search_tree = minimax(
+            board, self.depth, True, -float("inf"), float("inf"), move_from_parent=None
+        )
         duration = time.perf_counter() - start
         if move is None:
             valid_moves = board.valid_moves()
             move = valid_moves[0] if valid_moves else -1
+
+        def principal_variation(node: SearchNode) -> List[int]:
+            variation: List[int] = []
+            current = node
+            while current.children:
+                best_child: Optional[SearchNode] = None
+                if current.maximizing:
+                    best_score = max(child.score for child in current.children)
+                    for child in current.children:
+                        if child.score == best_score:
+                            best_child = child
+                            break
+                else:
+                    best_score = min(child.score for child in current.children)
+                    for child in current.children:
+                        if child.score == best_score:
+                            best_child = child
+                            break
+                if best_child is None or best_child.column is None:
+                    break
+                variation.append(best_child.column)
+                current = best_child
+            return variation
+
+        pv = principal_variation(search_tree)
         diagnostics = SearchDiagnostics(
             evaluated_moves=evaluations,
             search_depth=self.depth,
             duration_s=duration,
             nodes_expanded=nodes_expanded,
+            search_tree=search_tree,
+            principal_variation=pv,
         )
         logger.info(
             "AI move computed", extra={
