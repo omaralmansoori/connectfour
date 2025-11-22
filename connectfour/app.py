@@ -57,38 +57,65 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                     app.config["last_diagnostics"] = None
                     message = f"AI search depth set to {new_depth}. Higher depth means a slower but stronger opponent."
             elif not over:
-                try:
-                    col = int(request.form.get("column", ""))
-                except ValueError:
-                    message = "Invalid move"
-                else:
-                    result = board.drop_piece(col, Player.HUMAN)
-                    if result is None:
-                        message = "Column full or out of range"
+                # allow AI to make the first move when requested
+                if action == "ai_start":
+                    # only allow if the board is empty
+                    if any(cell != 0 for row in board.grid for cell in row):
+                        message = "Game already in progress"
                     else:
-                        app.config["last_ai_move"] = None  # clear previous AI move highlight
+                        move, diagnostics = ai.choose_move(board, Player.AI)
+                        result_ai = board.drop_piece(move, Player.AI)
+                        if result_ai:
+                            app.config["last_ai_move"] = (result_ai.row, result_ai.col)
+                        app.config["last_diagnostics"] = diagnostics
+                        last_diag = diagnostics
+                        logger.info(
+                            "Flask AI start move",
+                            extra={
+                                "move": move,
+                                "duration_s": diagnostics.duration_s,
+                                "depth": diagnostics.search_depth,
+                                "nodes": diagnostics.nodes_expanded,
+                            },
+                        )
                         over, winner = board.game_over()
-                        if not over:
-                            move, diagnostics = ai.choose_move(board, Player.AI)
-                            result_ai = board.drop_piece(move, Player.AI)
-                            if result_ai:
-                                app.config["last_ai_move"] = (result_ai.row, result_ai.col)
-                            app.config["last_diagnostics"] = diagnostics
-                            last_diag = diagnostics
-                            logger.info(
-                                "Flask AI move",
-                                extra={
-                                    "move": move,
-                                    "duration_s": diagnostics.duration_s,
-                                    "depth": diagnostics.search_depth,
-                                    "nodes": diagnostics.nodes_expanded,
-                                },
-                            )
-                            over, winner = board.game_over()
-                        else:
-                            app.config["last_diagnostics"] = None
                         if over:
                             message = "Draw!" if winner is None else f"{winner.name} wins!"
+                    # skip human move handling below
+                    # fall through to rendering
+                else:
+                    try:
+                        col = int(request.form.get("column", ""))
+                    except ValueError:
+                        message = "Invalid move"
+                    else:
+                        result = board.drop_piece(col, Player.HUMAN)
+                        if result is None:
+                            message = "Column full or out of range"
+                        else:
+                            app.config["last_ai_move"] = None  # clear previous AI move highlight
+                            over, winner = board.game_over()
+                            if not over:
+                                move, diagnostics = ai.choose_move(board, Player.AI)
+                                result_ai = board.drop_piece(move, Player.AI)
+                                if result_ai:
+                                    app.config["last_ai_move"] = (result_ai.row, result_ai.col)
+                                app.config["last_diagnostics"] = diagnostics
+                                last_diag = diagnostics
+                                logger.info(
+                                    "Flask AI move",
+                                    extra={
+                                        "move": move,
+                                        "duration_s": diagnostics.duration_s,
+                                        "depth": diagnostics.search_depth,
+                                        "nodes": diagnostics.nodes_expanded,
+                                    },
+                                )
+                                over, winner = board.game_over()
+                            else:
+                                app.config["last_diagnostics"] = None
+                            if over:
+                                message = "Draw!" if winner is None else f"{winner.name} wins!"
         board_rows = board.grid
         return render_template(
             "play.html",
