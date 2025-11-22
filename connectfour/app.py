@@ -26,6 +26,7 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
     app.config["board"] = Board()
     app.config["ai"] = MinimaxAI(depth=cfg.ai_depth)
     app.config["last_diagnostics"] = None
+    app.config["last_ai_move"] = None
 
     @app.route("/")
     def root() -> str:
@@ -61,13 +62,17 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                 except ValueError:
                     message = "Invalid move"
                 else:
-                    if board.drop_piece(col, Player.HUMAN) is None:
+                    result = board.drop_piece(col, Player.HUMAN)
+                    if result is None:
                         message = "Column full or out of range"
                     else:
+                        app.config["last_ai_move"] = None  # clear previous AI move highlight
                         over, winner = board.game_over()
                         if not over:
                             move, diagnostics = ai.choose_move(board, Player.AI)
-                            board.drop_piece(move, Player.AI)
+                            result_ai = board.drop_piece(move, Player.AI)
+                            if result_ai:
+                                app.config["last_ai_move"] = (result_ai.row, result_ai.col)
                             app.config["last_diagnostics"] = diagnostics
                             last_diag = diagnostics
                             logger.info(
@@ -93,6 +98,7 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
             cols=range(board.cols),
             game_over=over,
             ai_depth=ai.depth,
+            last_ai_move=app.config.get("last_ai_move"),
         )
 
     @app.route("/diagnostics")
@@ -111,6 +117,7 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
         board: Board = app.config["board"]
         board.reset()
         app.config["last_diagnostics"] = None
+        app.config["last_ai_move"] = None
         return redirect(url_for("play"))
 
     return app
@@ -191,6 +198,9 @@ PLAY_TEMPLATE = """
       place-items: center;
       border: 1px solid rgba(255,255,255,0.05);
       box-shadow: inset 0 8px 16px rgba(0,0,0,0.35);
+    }
+    .cell.last-move {
+      box-shadow: inset 0 8px 16px rgba(0,0,0,0.35), 0 0 20px rgba(255, 209, 102, 0.8);
     }
     .disc {
       width: 52px;
@@ -279,7 +289,9 @@ PLAY_TEMPLATE = """
                 {% set cell = board[r][c] %}
                 {% set color = '' %}
                 {% if cell == 1 %}{% set color = 'human' %}{% elif cell == 2 %}{% set color = 'ai' %}{% endif %}
-                <div class=\"cell\">
+                {% set extra_class = '' %}
+                {% if last_ai_move and r == last_ai_move[0] and c == last_ai_move[1] %}{% set extra_class = ' last-move' %}{% endif %}
+                <div class=\"cell{{ extra_class }}\">
                   <div class=\"disc {{ color }}\"></div>
                 </div>
               {% endfor %}
