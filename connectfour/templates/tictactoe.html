@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tic-Tac-Toe AI Lab</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <div class="top-bar">
+      <div>
+        <h1>Tic-Tac-Toe AI Lab</h1>
+        <p class="subtitle">A tiny game that makes alpha-beta pruning and search trees feel tangible.</p>
+      </div>
+      <div class="nav-buttons">
+        <a href="{{ url_for('play') }}" class="btn secondary">← Back to Connect Four</a>
+        <a href="{{ url_for('learn') }}" class="btn secondary">📚 Minimax Primer</a>
+      </div>
+    </div>
+
+    {% if message %}
+      <div class="status{% if game_over %} warning{% endif %}">{{ message }}</div>
+    {% endif %}
+
+    <div class="layout">
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <h2>Play Tic-Tac-Toe</h2>
+          <div class="legend">
+            <span><span class="token" style="background:var(--human)"></span>Human (X)</span>
+            <span><span class="token" style="background:var(--ai)"></span>AI (O)</span>
+          </div>
+        </div>
+
+        <div class="ttt-grid">
+          {% for r in range(size) %}
+            {% for c in range(size) %}
+              {% set val = board[r][c] %}
+              {% set idx = r * size + c %}
+              {% set token = 'X' if val == 1 else 'O' if val == 2 else '·' %}
+              {% set cls = 'human' if val == 1 else 'ai' if val == 2 else '' %}
+              {% set highlight = '' %}
+              {% if last_ai_move and last_ai_move[0] == r and last_ai_move[1] == c %}
+                {% set highlight = ' last-move' %}
+              {% endif %}
+              <div class="ttt-cell{{ highlight }}">
+                {% if val == 0 and not game_over %}
+                  <form method="post">
+                    <input type="hidden" name="action" value="move" />
+                    <input type="hidden" name="move" value="{{ idx }}" />
+                    <button class="ttt-move" type="submit">Place</button>
+                  </form>
+                {% else %}
+                  <span class="ttt-token {{ cls }}">{{ token }}</span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+
+        <div class="controls">
+          <form method="post" style="display:inline;">
+            <input type="hidden" name="action" value="ai_start" />
+            <button class="btn secondary" type="submit">🤖 Let AI start</button>
+          </form>
+          <a href="{{ url_for('tictactoe_reset') }}" class="btn secondary">Reset</a>
+          <form method="post" class="depth-inline">
+            <input type="hidden" name="action" value="set_depth" />
+            <label for="depth"><strong>Depth</strong> (2-9):</label>
+            <input type="range" id="depth" name="depth" min="2" max="9" value="{{ ai_depth }}" oninput="depthValue.innerText=this.value" />
+            <span id="depthValue" class="pill">{{ ai_depth }}</span>
+            <button class="btn" type="submit">Update</button>
+          </form>
+        </div>
+
+        {% if game_over %}
+          <div class="status warning">Game over. Reset to replay or let the AI start a new tree.</div>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <h2>Analysis & Learning</h2>
+        <p class="subtitle">See how minimax explores a full search tree and prunes branches with alpha-beta.</p>
+
+        <div class="insight-grid" style="margin-bottom:12px;">
+          <div class="stat">
+            <div class="label">Search depth</div>
+            <div class="value">{{ ai_depth }} ply</div>
+            <div class="pill">Depth 9 = full game tree</div>
+          </div>
+          <div class="stat">
+            <div class="label">Nodes expanded</div>
+            <div class="value">{{ last_diag.nodes_expanded if last_diag else '—' }}</div>
+            <div class="pill">Lower count = better pruning</div>
+          </div>
+          <div class="stat">
+            <div class="label">Search time</div>
+            <div class="value">{% if last_diag %}{{ '%.4f'|format(last_diag.duration_s) }}s{% else %}—{% endif %}</div>
+            <div class="pill">Shallow depths are instant</div>
+          </div>
+        </div>
+
+        <div class="concept-section">
+          <h3>Principal variation</h3>
+          {% if last_diag and last_diag.principal_variation %}
+            <div class="pv">
+              {% for step in last_diag.principal_variation %}
+                <span class="step">({{ (step // size) + 1 }}, {{ (step % size) + 1 }})</span>
+              {% endfor %}
+            </div>
+            <p class="subtitle">The sequence above is the AI's best line assuming perfect play.</p>
+          {% else %}
+            <p class="subtitle">Play a move to reveal the AI's planned line of play.</p>
+          {% endif %}
+        </div>
+
+        <div class="concept-section">
+          <h3>Move evaluations (root)</h3>
+          {% if last_diag and last_diag.evaluated_moves %}
+            <ul class="list">
+              {% for ev in last_diag.evaluated_moves %}
+                <li>Cell ({{ (ev.column // size) + 1 }}, {{ (ev.column % size) + 1 }}): <strong>{{ ev.score }}</strong></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="subtitle">Each score comes from simulating both players. Higher is better for the AI.</p>
+          {% endif %}
+        </div>
+
+        <div class="concept-section">
+          <h3>Search tree snapshot</h3>
+          {% if last_diag %}
+            <div class="tree">
+              {% for child in last_diag.search_tree.children[:5] %}
+                <div class="tree-node">
+                  <div class="tree-label">AI tries ({{ (child.column // size) + 1 }}, {{ (child.column % size) + 1 }}) → score {{ child.score }}</div>
+                  <div class="tree-children">
+                    {% for reply in child.children[:4] %}
+                      <div class="tree-node depth">
+                        <div class="tree-label">Human replies ({{ (reply.column // size) + 1 }}, {{ (reply.column % size) + 1 }}) → {{ reply.score }}</div>
+                      </div>
+                    {% else %}
+                      <div class="tree-label">Leaf node reached</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+            <p class="subtitle">Branches cut by alpha-beta are skipped entirely, reducing node count without changing the best move.</p>
+          {% else %}
+            <p class="subtitle">Make a move to build a fresh search tree. You'll see replies and counter-replies right away.</p>
+          {% endif %}
+        </div>
+
+        <div class="concept-section">
+          <div class="key-point">
+            <strong>Teaching tip:</strong> Try depth 2 vs. depth 9 and compare the node counts. The dramatic drop shows how alpha-beta pruning trims away hopeless lines.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

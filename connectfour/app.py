@@ -9,6 +9,7 @@ from flask import Flask, redirect, render_template, request, url_for
 from .ai import MinimaxAI, SearchDiagnostics
 from .board import Board, Player
 from .config import GameConfig
+from .tictactoe import TicTacToeBoard, evaluate_tictactoe
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,11 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
     app.config["ai"] = MinimaxAI(depth=cfg.ai_depth)
     app.config["last_diagnostics"] = None
     app.config["last_ai_move"] = None
+    app.config["ttt_board"] = TicTacToeBoard()
+    app.config["ttt_ai_depth"] = 6
+    app.config["ttt_ai"] = MinimaxAI(depth=6, evaluator=evaluate_tictactoe)
+    app.config["ttt_diagnostics"] = None
+    app.config["ttt_last_ai_move"] = None
 
     @app.route("/")
     def root() -> str:
@@ -142,6 +148,105 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
     @app.route("/learn")
     def learn():
         return render_template("learn.html")
+
+    @app.route("/tictactoe", methods=["GET", "POST"])
+    def tictactoe():
+        board: TicTacToeBoard = app.config["ttt_board"]
+        ai: MinimaxAI = app.config["ttt_ai"]
+        last_diag: Optional[SearchDiagnostics] = app.config.get("ttt_diagnostics")
+
+        over, winner = board.game_over()
+        message = "Draw!" if over and winner is None else f"{winner.name} wins!" if winner else ""
+
+        if request.method == "POST":
+            action = request.form.get("action", "move")
+
+            if action == "set_depth":
+                try:
+                    new_depth = int(request.form.get("depth", ai.depth))
+                except ValueError:
+                    message = "Depth must be a number between 2 and 9"
+                else:
+                    new_depth = max(2, min(9, new_depth))
+                    app.config["ttt_ai_depth"] = new_depth
+                    app.config["ttt_ai"] = MinimaxAI(depth=new_depth, evaluator=evaluate_tictactoe)
+                    ai = app.config["ttt_ai"]
+                    app.config["ttt_diagnostics"] = None
+                    message = "Updated Tic-Tac-Toe depth. Max depth explores the full game tree."
+            elif action == "ai_start":
+                if not board.is_empty():
+                    message = "Game already in progress"
+                else:
+                    move, diagnostics = ai.choose_move(board, Player.AI)
+                    result_ai = board.drop_piece(move, Player.AI)
+                    if result_ai:
+                        app.config["ttt_last_ai_move"] = (result_ai.row, result_ai.col)
+                    app.config["ttt_diagnostics"] = diagnostics
+                    last_diag = diagnostics
+                    logger.info(
+                        "TicTacToe AI start move",
+                        extra={
+                            "move": move,
+                            "duration_s": diagnostics.duration_s,
+                            "depth": diagnostics.search_depth,
+                            "nodes": diagnostics.nodes_expanded,
+                        },
+                    )
+                    over, winner = board.game_over()
+                    if over:
+                        message = "Draw!" if winner is None else f"{winner.name} wins!"
+            elif not over:
+                try:
+                    move = int(request.form.get("move", ""))
+                except ValueError:
+                    message = "Invalid move"
+                else:
+                    result = board.drop_piece(move, Player.HUMAN)
+                    if result is None:
+                        message = "Cell already taken."
+                    else:
+                        app.config["ttt_last_ai_move"] = None
+                        over, winner = board.game_over()
+                        if not over:
+                            ai_move, diagnostics = ai.choose_move(board, Player.AI)
+                            result_ai = board.drop_piece(ai_move, Player.AI)
+                            if result_ai:
+                                app.config["ttt_last_ai_move"] = (result_ai.row, result_ai.col)
+                            app.config["ttt_diagnostics"] = diagnostics
+                            last_diag = diagnostics
+                            logger.info(
+                                "TicTacToe AI move",
+                                extra={
+                                    "move": ai_move,
+                                    "duration_s": diagnostics.duration_s,
+                                    "depth": diagnostics.search_depth,
+                                    "nodes": diagnostics.nodes_expanded,
+                                },
+                            )
+                            over, winner = board.game_over()
+                        else:
+                            app.config["ttt_diagnostics"] = None
+                        if over:
+                            message = "Draw!" if winner is None else f"{winner.name} wins!"
+
+        return render_template(
+            "tictactoe.html",
+            board=board.grid,
+            message=message,
+            game_over=over,
+            last_diag=last_diag,
+            ai_depth=app.config["ttt_ai_depth"],
+            last_ai_move=app.config.get("ttt_last_ai_move"),
+            size=board.rows,
+        )
+
+    @app.route("/tictactoe/reset")
+    def tictactoe_reset():
+        board: TicTacToeBoard = app.config["ttt_board"]
+        board.reset()
+        app.config["ttt_diagnostics"] = None
+        app.config["ttt_last_ai_move"] = None
+        return redirect(url_for("tictactoe"))
 
     @app.route("/reset")
     def reset():

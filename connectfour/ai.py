@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 from .board import Board, Player
 
@@ -36,8 +36,11 @@ class SearchNode:
 
 
 class MinimaxAI:
-    def __init__(self, depth: int = 4) -> None:
+    def __init__(
+        self, depth: int = 4, evaluator: Optional[Callable[[Any, Player], int]] = None
+    ) -> None:
         self.depth = depth
+        self._custom_evaluator = evaluator
 
     def choose_move(self, board: Board, player: Player = Player.AI) -> Tuple[int, SearchDiagnostics]:
         start = time.perf_counter()
@@ -63,7 +66,7 @@ class MinimaxAI:
                 children=[],
             )
             if depth == 0 or game_over:
-                eval_score = self.evaluate_board(state, player)
+                eval_score = self._evaluate(state, player)
                 node.score = eval_score
                 return eval_score, None, node
 
@@ -162,6 +165,11 @@ class MinimaxAI:
     def evaluate_board(self, board: Board, player: Player) -> int:
         opponent = Player.HUMAN if player == Player.AI else Player.AI
         return self.score_position(board, player) - self.score_position(board, opponent)
+
+    def _evaluate(self, board: Board, player: Player) -> int:
+        if self._custom_evaluator:
+            return self._custom_evaluator(board, player)
+        return self.evaluate_board(board, player)
 
     def score_position(self, board: Board, player: Player) -> int:
         grid = board.grid
