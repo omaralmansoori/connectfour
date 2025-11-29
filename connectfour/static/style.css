@@ -400,6 +400,97 @@ select, input[type=number], input[type=range] {
   gap: 10px;
 }
 
+/* Tic-Tac-Toe lab styles */
+.nav-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ttt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 110px);
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.ttt-cell {
+  height: 110px;
+  border-radius: 14px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.02);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 8px 14px rgba(0,0,0,0.35);
+}
+
+.ttt-cell.last-move {
+  box-shadow: inset 0 8px 14px rgba(0,0,0,0.35), 0 0 14px rgba(255, 209, 102, 0.75);
+}
+
+.ttt-token {
+  font-size: 42px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.ttt-token.human { color: var(--human); }
+.ttt-token.ai { color: var(--ai); }
+
+.ttt-move {
+  background: linear-gradient(135deg, rgba(93,208,255,0.16), rgba(93,208,255,0.28));
+  border: 1px dashed rgba(93,208,255,0.45);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.depth-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tree-node {
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--panel-border);
+}
+
+.tree-node.depth {
+  background: rgba(255,179,71,0.05);
+  border-color: rgba(255,179,71,0.3);
+}
+
+.tree-label {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.tree-children {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
 .legend-box {
   width: 24px;
   height: 24px;
