@@ -107,3 +107,32 @@
 .node-tooltip.visible {
   display: block;
 }
+
+/* Collapse/Expand indicator styles */
+.collapse-indicator {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 10px;
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+
+.tree-node.collapsible {
+  cursor: pointer;
+}
+
+.tree-node.collapsible:hover .collapse-indicator {
+  transform: scale(1.2);
+}
+
+.tree-node.collapsed {
+  opacity: 0.85;
+  border-style: dashed;
+}
+
+.collapsed-hint {
+  font-size: 10px;
+  color: var(--accent);
+  margin-top: 4px;
+  font-style: italic;
+}

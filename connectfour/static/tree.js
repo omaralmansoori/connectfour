@@ -1,14 +1,18 @@
-// Tree visualization for Connect Four AI diagnostics - Educational Version
+// Tree visualization for Connect Four / Tic-Tac-Toe AI diagnostics - Educational Version
 class TreeVisualizer {
-  constructor(treeData, principalVariation, evaluatedMoves) {
+  constructor(treeData, principalVariation, evaluatedMoves, gameType = 'connectfour') {
     this.treeData = treeData;
     this.principalVariation = principalVariation || [];
     this.evaluatedMoves = evaluatedMoves || [];
     this.container = document.getElementById('treeContainer');
+    this.gameType = gameType; // 'connectfour' or 'tictactoe'
     this.showScores = true;
     this.highlightBest = true;
     this.showBestOnly = true;
     this.maxDepthToShow = 4;
+    
+    // Track collapsed nodes by their unique path
+    this.collapsedNodes = new Set();
     
     this.nodeWidth = 180;
     this.nodeHeight = 85;
@@ -17,6 +21,16 @@ class TreeVisualizer {
     
     this.setupControls();
     this.render();
+  }
+  
+  // Format move label based on game type
+  formatMove(move) {
+    if (this.gameType === 'tictactoe') {
+      const row = Math.floor(move / 3) + 1;
+      const col = (move % 3) + 1;
+      return `Cell (${row},${col})`;
+    }
+    return `Column ${move}`;
   }
   
   setupControls() {
@@ -46,11 +60,30 @@ class TreeVisualizer {
     }
   }
   
+  // Generate a unique path identifier for a node
+  getNodePath(node, level, parentPath = '') {
+    const col = node.column !== null && node.column !== undefined ? node.column : 'root';
+    return parentPath ? `${parentPath}-${col}` : `${col}`;
+  }
+  
+  // Toggle collapse state for a node
+  toggleCollapse(nodePath) {
+    if (this.collapsedNodes.has(nodePath)) {
+      this.collapsedNodes.delete(nodePath);
+    } else {
+      this.collapsedNodes.add(nodePath);
+    }
+    this.render();
+  }
+  
   collectNodesForDisplay() {
     const nodes = [];
     
-    const traverse = (node, level = 0, parentIndex = -1, isInBestPath = true) => {
+    const traverse = (node, level = 0, parentIndex = -1, isInBestPath = true, parentPath = '') => {
       if (!node || level > this.maxDepthToShow) return;
+      
+      // Generate unique path for this node
+      const nodePath = this.getNodePath(node, level, parentPath);
       
       // Determine if this node is in the principal variation
       const nodeInPV = level === 0 || (
@@ -66,21 +99,27 @@ class TreeVisualizer {
         return;
       }
       
+      const hasChildren = node.children && node.children.length > 0;
+      const isCollapsed = this.collapsedNodes.has(nodePath);
+      
       const nodeInfo = {
         node: node,
         level: level,
         parentIndex: parentIndex,
         isInBestPath: inBest,
-        index: nodes.length
+        index: nodes.length,
+        nodePath: nodePath,
+        hasChildren: hasChildren,
+        isCollapsed: isCollapsed
       };
       
       nodes.push(nodeInfo);
       const currentIndex = nodes.length - 1;
       
-      // Process children
-      if (node.children && node.children.length > 0) {
+      // Process children only if not collapsed
+      if (hasChildren && !isCollapsed) {
         node.children.forEach(child => {
-          traverse(child, level + 1, currentIndex, inBest);
+          traverse(child, level + 1, currentIndex, inBest, nodePath);
         });
       }
     };
@@ -178,15 +217,16 @@ class TreeVisualizer {
       z-index: 10;
     `;
     
-    const bestMove = this.principalVariation.length > 0 ? this.principalVariation[0] : 'N/A';
+    const bestMove = this.principalVariation.length > 0 ? this.principalVariation[0] : null;
     const bestEval = this.evaluatedMoves.find(m => m.column === bestMove);
     const bestScore = bestEval ? bestEval.score : 'N/A';
+    const bestMoveLabel = bestMove !== null ? this.formatMove(bestMove) : 'N/A';
     
     summary.innerHTML = `
       <div style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap; justify-content: center;">
         <div style="text-align: center;">
           <div style="color: var(--muted); font-size: 12px; margin-bottom: 4px;">AI's Chosen Move</div>
-          <div style="color: var(--ai); font-size: 24px; font-weight: 700;">Column ${bestMove}</div>
+          <div style="color: var(--ai); font-size: 24px; font-weight: 700;">${bestMoveLabel}</div>
         </div>
         <div style="text-align: center;">
           <div style="color: var(--muted); font-size: 12px; margin-bottom: 4px;">Evaluated Score</div>
@@ -235,24 +275,50 @@ class TreeVisualizer {
       nodeEl.classList.add('best-path');
     }
     
+    // Add collapsible class if node has children
+    if (nodeInfo.hasChildren) {
+      nodeEl.classList.add('collapsible');
+      if (nodeInfo.isCollapsed) {
+        nodeEl.classList.add('collapsed');
+      }
+    }
+    
     nodeEl.style.left = (nodeInfo.x + 30) + 'px';
     nodeEl.style.top = (nodeInfo.y + 30) + 'px';
     
     const moveDesc = nodeInfo.level === 0 
       ? '🎯 Current State' 
-      : `${isAITurn ? '🤖' : '👤'} Column ${node.column}`;
+      : `${isAITurn ? '🤖' : '👤'} ${this.formatMove(node.column)}`;
     
     const scoreDisplay = this.showScores 
       ? `<div class="node-score">Score: ${node.score}</div>`
       : '';
     
+    // Add collapse indicator for nodes with children
+    const collapseIndicator = nodeInfo.hasChildren 
+      ? `<span class="collapse-indicator">${nodeInfo.isCollapsed ? '▶' : '▼'}</span>` 
+      : '';
+    
+    const childCount = nodeInfo.hasChildren && nodeInfo.isCollapsed
+      ? `<div class="collapsed-hint">${node.children.length} hidden</div>`
+      : '';
+    
     nodeEl.innerHTML = `
-      <div class="node-label">${moveDesc}</div>
+      <div class="node-label">${collapseIndicator}${moveDesc}</div>
       <div class="node-info">
         <div style="font-size: 11px;">Level ${nodeInfo.level} • ${isAITurn ? 'AI Maximizes' : 'Human Minimizes'}</div>
         ${scoreDisplay}
+        ${childCount}
       </div>
     `;
+    
+    // Add click handler to toggle collapse
+    if (nodeInfo.hasChildren) {
+      nodeEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleCollapse(nodeInfo.nodePath);
+      });
+    }
     
     nodeEl.addEventListener('mouseenter', (e) => {
       this.showTooltip(e, nodeInfo);
@@ -275,7 +341,7 @@ class TreeVisualizer {
 r    }
     
     const moveInfo = node.column !== null && node.column !== undefined 
-      ? `Column ${node.column}` 
+      ? this.formatMove(node.column) 
       : 'Root (Current Board State)';
     
     const pvInfo = nodeInfo.isInBestPath 
@@ -285,6 +351,11 @@ r    }
     const explanation = node.maximizing 
       ? 'AI evaluates moves to find the highest score'
       : 'AI predicts human will choose the lowest score';
+    
+    const hasChildren = node.children && node.children.length > 0;
+    const collapseHint = hasChildren 
+      ? `<div style="margin-top: 6px; color: var(--accent); font-size: 11px;">💡 Click to ${nodeInfo.isCollapsed ? 'expand' : 'collapse'} children</div>`
+      : '';
     
     tooltip.innerHTML = `
       <div style="margin-bottom: 8px; font-size: 14px;"><strong>Node Information</strong></div>
@@ -297,6 +368,7 @@ r    }
       <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--panel-border); color: var(--muted); font-size: 11px;">
         ${explanation}
       </div>
+      ${collapseHint}
     `;
     
     tooltip.classList.add('visible');
@@ -319,6 +391,7 @@ r    }
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof treeData !== 'undefined' && typeof principalVariation !== 'undefined') {
     const evaluatedMoves = typeof evaluatedMovesData !== 'undefined' ? evaluatedMovesData : [];
-    new TreeVisualizer(treeData, principalVariation, evaluatedMoves);
+    const gameType = typeof gameTypeData !== 'undefined' ? gameTypeData : 'connectfour';
+    new TreeVisualizer(treeData, principalVariation, evaluatedMoves, gameType);
   }
 });
