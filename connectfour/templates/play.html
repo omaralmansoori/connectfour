@@ -13,7 +13,13 @@
         <h1>Connect Four AI Coach</h1>
         <p class="subtitle">A classroom-ready experience for exploring minimax search. Human moves first.</p>
       </div>
-      <span class="badge">Learning Mode · Search tree + live board</span>
+      <div class="nav-buttons">
+        <div class="game-switcher">
+          <span class="btn active">🟡 Connect Four</span>
+          <a href="{{ url_for('tictactoe') }}" class="btn secondary">❌⭕ Tic-Tac-Toe</a>
+        </div>
+        <a href="{{ url_for('learn') }}" class="btn secondary">📚 Minimax Primer</a>
+      </div>
     </div>
 
     {% if message %}
@@ -56,7 +62,6 @@
           </form>
           <a href="{{ url_for('reset') }}" class="btn secondary">Reset</a>
           <a href="{{ url_for('analysis') }}" class="btn secondary">🔍 AI Analysis</a>
-          <a href="{{ url_for('tictactoe') }}" class="btn secondary">❌⭕ Tic-Tac-Toe Lab</a>
           <a href="{{ url_for('learn') }}" class="btn secondary">📚 Learn Minimax</a>
         </div>
         {% if game_over %}
