@@ -14,7 +14,10 @@
         <p class="subtitle">A tiny game that makes alpha-beta pruning and search trees feel tangible.</p>
       </div>
       <div class="nav-buttons">
-        <a href="{{ url_for('play') }}" class="btn secondary">← Back to Connect Four</a>
+        <div class="game-switcher">
+          <a href="{{ url_for('play') }}" class="btn secondary">🟡 Connect Four</a>
+          <span class="btn active">❌⭕ Tic-Tac-Toe</span>
+        </div>
         <a href="{{ url_for('learn') }}" class="btn secondary">📚 Minimax Primer</a>
       </div>
     </div>
@@ -65,6 +68,7 @@
             <button class="btn secondary" type="submit">🤖 Let AI start</button>
           </form>
           <a href="{{ url_for('tictactoe_reset') }}" class="btn secondary">Reset</a>
+          <a href="{{ url_for('tictactoe_analysis') }}" class="btn secondary">🔍 AI Analysis</a>
           <form method="post" class="depth-inline">
             <input type="hidden" name="action" value="set_depth" />
             <label for="depth"><strong>Depth</strong> (2-9):</label>
