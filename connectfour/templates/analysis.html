@@ -13,9 +13,49 @@
     <p>Explore the minimax search tree with interactive visualization. See how the AI evaluates each possible move.</p>
     <p><a href="{{ url_for('play') }}">← Back to game</a></p>
     
+    <!-- Move History Navigator -->
+    {% if history and history|length > 0 %}
+    <div class="panel" style="margin-bottom: 20px;">
+      <h2>🕐 Move History</h2>
+      <p class="subtitle">Review how the AI made decisions at each step of the game.</p>
+      <div class="move-history-nav">
+        <div class="history-controls">
+          {% if selected_move > 1 %}
+            <a href="{{ url_for('analysis', move=1) }}" class="history-btn" title="First move">⏮</a>
+            <a href="{{ url_for('analysis', move=selected_move - 1) }}" class="history-btn" title="Previous move">◀</a>
+          {% else %}
+            <span class="history-btn disabled">⏮</span>
+            <span class="history-btn disabled">◀</span>
+          {% endif %}
+          
+          <div class="history-selector">
+            <select id="moveSelector" onchange="window.location.href='{{ url_for('analysis') }}?move=' + this.value">
+              {% for entry in history %}
+                <option value="{{ entry.move_num }}" {% if entry.move_num == selected_move %}selected{% endif %}>
+                  AI Move #{{ entry.move_num }} → Column {{ entry.ai_move }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          {% if selected_move < total_moves %}
+            <a href="{{ url_for('analysis', move=selected_move + 1) }}" class="history-btn" title="Next move">▶</a>
+            <a href="{{ url_for('analysis', move=total_moves) }}" class="history-btn" title="Latest move">⏭</a>
+          {% else %}
+            <span class="history-btn disabled">▶</span>
+            <span class="history-btn disabled">⏭</span>
+          {% endif %}
+        </div>
+        <div class="history-info">
+          Viewing move <strong>{{ selected_move }}</strong> of <strong>{{ total_moves }}</strong>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    
     <!-- Board State Section -->
     <div class="panel" style="margin-bottom: 20px;">
-      <h2>Board State</h2>
+      <h2>Board State {% if selected_move %}(After AI Move #{{ selected_move }}){% endif %}</h2>
       <div class="board-small">
         {% for r in range(board|length) %}
           {% for c in cols %}
