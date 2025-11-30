@@ -28,11 +28,13 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
     app.config["ai"] = MinimaxAI(depth=cfg.ai_depth)
     app.config["last_diagnostics"] = None
     app.config["last_ai_move"] = None
+    app.config["diagnostics_history"] = []  # Store history of all AI decisions
     app.config["ttt_board"] = TicTacToeBoard()
     app.config["ttt_ai_depth"] = 6
     app.config["ttt_ai"] = MinimaxAI(depth=6, evaluator=evaluate_tictactoe)
     app.config["ttt_diagnostics"] = None
     app.config["ttt_last_ai_move"] = None
+    app.config["ttt_diagnostics_history"] = []  # Store history for tic-tac-toe too
 
     @app.route("/")
     def root() -> str:
@@ -61,6 +63,7 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                     app.config["ai"] = MinimaxAI(depth=new_depth)
                     ai = app.config["ai"]
                     app.config["last_diagnostics"] = None
+                    app.config["diagnostics_history"] = []  # Clear history on depth change
                     message = f"AI search depth set to {new_depth}. Higher depth means a slower but stronger opponent."
             elif not over:
                 # allow AI to make the first move when requested
@@ -74,6 +77,14 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                         if result_ai:
                             app.config["last_ai_move"] = (result_ai.row, result_ai.col)
                         app.config["last_diagnostics"] = diagnostics
+                        # Add to history with move number and board snapshot
+                        move_num = len(app.config["diagnostics_history"]) + 1
+                        app.config["diagnostics_history"].append({
+                            "move_num": move_num,
+                            "ai_move": move,
+                            "diagnostics": diagnostics,
+                            "board_snapshot": [row[:] for row in board.grid]  # Deep copy
+                        })
                         last_diag = diagnostics
                         logger.info(
                             "Flask AI start move",
@@ -107,6 +118,14 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                                 if result_ai:
                                     app.config["last_ai_move"] = (result_ai.row, result_ai.col)
                                 app.config["last_diagnostics"] = diagnostics
+                                # Add to history with move number and board snapshot
+                                move_num = len(app.config["diagnostics_history"]) + 1
+                                app.config["diagnostics_history"].append({
+                                    "move_num": move_num,
+                                    "ai_move": move,
+                                    "diagnostics": diagnostics,
+                                    "board_snapshot": [row[:] for row in board.grid]  # Deep copy
+                                })
                                 last_diag = diagnostics
                                 logger.info(
                                     "Flask AI move",
@@ -136,13 +155,32 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
 
     @app.route("/analysis")
     def analysis():
-        last_diag: Optional[SearchDiagnostics] = app.config.get("last_diagnostics")
+        history = app.config.get("diagnostics_history", [])
         board: Board = app.config["board"]
+        
+        # Get selected move from query parameter, default to latest
+        selected_move = request.args.get("move", type=int)
+        
+        if history:
+            if selected_move is None or selected_move < 1 or selected_move > len(history):
+                selected_move = len(history)  # Default to latest move
+            
+            selected_entry = history[selected_move - 1]
+            diag = selected_entry["diagnostics"]
+            board_snapshot = selected_entry["board_snapshot"]
+        else:
+            diag = app.config.get("last_diagnostics")
+            board_snapshot = board.grid
+            selected_move = None
+        
         return render_template(
             "analysis.html",
-            diag=last_diag,
-            board=board.grid,
+            diag=diag,
+            board=board_snapshot,
             cols=range(board.cols),
+            history=history,
+            selected_move=selected_move,
+            total_moves=len(history),
         )
 
     @app.route("/learn")
@@ -172,6 +210,7 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                     app.config["ttt_ai"] = MinimaxAI(depth=new_depth, evaluator=evaluate_tictactoe)
                     ai = app.config["ttt_ai"]
                     app.config["ttt_diagnostics"] = None
+                    app.config["ttt_diagnostics_history"] = []  # Clear history on depth change
                     message = "Updated Tic-Tac-Toe depth. Max depth explores the full game tree."
             elif action == "ai_start":
                 if not board.is_empty():
@@ -182,6 +221,14 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                     if result_ai:
                         app.config["ttt_last_ai_move"] = (result_ai.row, result_ai.col)
                     app.config["ttt_diagnostics"] = diagnostics
+                    # Add to history with move number and board snapshot
+                    move_num = len(app.config["ttt_diagnostics_history"]) + 1
+                    app.config["ttt_diagnostics_history"].append({
+                        "move_num": move_num,
+                        "ai_move": move,
+                        "diagnostics": diagnostics,
+                        "board_snapshot": [row[:] for row in board.grid]  # Deep copy
+                    })
                     last_diag = diagnostics
                     logger.info(
                         "TicTacToe AI start move",
@@ -213,6 +260,14 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
                             if result_ai:
                                 app.config["ttt_last_ai_move"] = (result_ai.row, result_ai.col)
                             app.config["ttt_diagnostics"] = diagnostics
+                            # Add to history with move number and board snapshot
+                            move_num = len(app.config["ttt_diagnostics_history"]) + 1
+                            app.config["ttt_diagnostics_history"].append({
+                                "move_num": move_num,
+                                "ai_move": ai_move,
+                                "diagnostics": diagnostics,
+                                "board_snapshot": [row[:] for row in board.grid]  # Deep copy
+                            })
                             last_diag = diagnostics
                             logger.info(
                                 "TicTacToe AI move",
@@ -240,12 +295,43 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
             size=board.rows,
         )
 
+    @app.route("/tictactoe/analysis")
+    def tictactoe_analysis():
+        history = app.config.get("ttt_diagnostics_history", [])
+        board: TicTacToeBoard = app.config["ttt_board"]
+        
+        # Get selected move from query parameter, default to latest
+        selected_move = request.args.get("move", type=int)
+        
+        if history:
+            if selected_move is None or selected_move < 1 or selected_move > len(history):
+                selected_move = len(history)  # Default to latest move
+            
+            selected_entry = history[selected_move - 1]
+            diag = selected_entry["diagnostics"]
+            board_snapshot = selected_entry["board_snapshot"]
+        else:
+            diag = app.config.get("ttt_diagnostics")
+            board_snapshot = board.grid
+            selected_move = None
+        
+        return render_template(
+            "tictactoe_analysis.html",
+            diag=diag,
+            board=board_snapshot,
+            size=board.rows,
+            history=history,
+            selected_move=selected_move,
+            total_moves=len(history),
+        )
+
     @app.route("/tictactoe/reset")
     def tictactoe_reset():
         board: TicTacToeBoard = app.config["ttt_board"]
         board.reset()
         app.config["ttt_diagnostics"] = None
         app.config["ttt_last_ai_move"] = None
+        app.config["ttt_diagnostics_history"] = []  # Clear history on reset
         return redirect(url_for("tictactoe"))
 
     @app.route("/reset")
@@ -254,6 +340,7 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
         board.reset()
         app.config["last_diagnostics"] = None
         app.config["last_ai_move"] = None
+        app.config["diagnostics_history"] = []  # Clear history on reset
         return redirect(url_for("play"))
 
     return app
