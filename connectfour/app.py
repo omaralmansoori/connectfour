@@ -43,6 +43,12 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
     app.config["checkers_diagnostics"] = None
     app.config["checkers_last_ai_move"] = None
     app.config["checkers_diagnostics_history"] = []
+    app.config["simulation_defaults"] = {
+        "game": "connectfour",
+        "depth_a": 4,
+        "depth_b": 4,
+        "max_turns": 64,
+    }
 
     @app.route("/")
     def root() -> str:
@@ -499,6 +505,127 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
         app.config["checkers_last_ai_move"] = None
         app.config["checkers_diagnostics_history"] = []
         return redirect(url_for("checkers"))
+
+    @app.route("/simulate", methods=["GET", "POST"])
+    def simulate():
+        defaults = app.config["simulation_defaults"]
+        selected_game = request.form.get("game", defaults["game"]) if request.method == "POST" else defaults["game"]
+        depth_a = request.form.get("depth_a", defaults["depth_a"])
+        depth_b = request.form.get("depth_b", defaults["depth_b"])
+        max_turns = request.form.get("max_turns", defaults["max_turns"])
+        error = None
+        result = None
+
+        def game_factory(game: str):
+            if game == "connectfour":
+                return Board(), MinimaxAI, None
+            if game == "tictactoe":
+                return TicTacToeBoard(), MinimaxAI, evaluate_tictactoe
+            if game == "checkers":
+                return CheckersBoard(), MinimaxAI, evaluate_checkers
+            raise ValueError("Unknown game type")
+
+        def describe_move(game: str, move, board_rows: int, board_cols: int) -> str:
+            if game == "connectfour":
+                return f"Column {move}"
+            if game == "tictactoe":
+                row, col = divmod(int(move), board_cols)
+                return f"Cell ({row}, {col})"
+            if game == "checkers":
+                path = getattr(move, "path", [])
+                captures = getattr(move, "captures", [])
+                path_str = " → ".join(f"({r},{c})" for r, c in path)
+                capture_info = f" | captures {len(captures)}" if captures else ""
+                return f"Path {path_str}{capture_info}" if path_str else "Checkers move"
+            return "Move"
+
+        def simulate_game(game: str, d_a: int, d_b: int, limit: int):
+            board, ai_cls, evaluator = game_factory(game)
+            ai_a = ai_cls(depth=d_a, evaluator=evaluator)
+            ai_b = ai_cls(depth=d_b, evaluator=evaluator)
+            move_history = []
+            total_nodes = 0
+            total_time = 0.0
+            over, winner = board.game_over()
+            for turn in range(limit):
+                if over:
+                    break
+                player = Player.HUMAN if turn % 2 == 0 else Player.AI
+                active_ai = ai_a if player == Player.HUMAN else ai_b
+                move, diag = active_ai.choose_move(board, player)
+                placed = board.drop_piece(move, player)
+                if placed is None:
+                    error_msg = f"AI attempted invalid move on turn {turn + 1}."
+                    return None, error_msg
+                move_history.append(
+                    {
+                        "turn": turn + 1,
+                        "player": "AI A" if player == Player.HUMAN else "AI B",
+                        "as_player": player.name,
+                        "move": describe_move(game, move, board.rows, board.cols),
+                        "diagnostics": diag,
+                        "board_snapshot": [row[:] for row in board.grid],
+                    }
+                )
+                total_nodes += diag.nodes_expanded
+                total_time += diag.duration_s
+                over, winner = board.game_over()
+
+            summary = {
+                "game": game,
+                "rows": board.rows,
+                "cols": board.cols,
+                "history": move_history,
+                "over": over,
+                "winner": winner,
+                "final_board": board.grid,
+                "total_nodes": total_nodes,
+                "total_time": total_time,
+                "max_turns_hit": len(move_history) >= limit and not over,
+                "depth_a": d_a,
+                "depth_b": d_b,
+            }
+            return summary, None
+
+        if request.method == "POST":
+            try:
+                depth_a_val = max(1, min(10, int(depth_a)))
+                depth_b_val = max(1, min(10, int(depth_b)))
+                max_turns_val = max(4, min(200, int(max_turns)))
+            except ValueError:
+                error = "Depth and turn limit must be numbers."
+            else:
+                result, error = simulate_game(selected_game, depth_a_val, depth_b_val, max_turns_val)
+                depth_a = depth_a_val
+                depth_b = depth_b_val
+                max_turns = max_turns_val
+                defaults.update(
+                    {"game": selected_game, "depth_a": depth_a, "depth_b": depth_b, "max_turns": max_turns}
+                )
+
+        analysis_text = None
+        if result:
+            if result["winner"] is None:
+                verdict = "It was a draw—did the shallower AI hold its own?"
+            else:
+                victor = "AI A" if result["winner"] == Player.HUMAN else "AI B"
+                verdict = f"{victor} prevailed while playing as {result['winner'].name}."
+            depth_note = "Both AIs searched equally deep." if depth_a == depth_b else (
+                "AI A searched deeper." if depth_a > depth_b else "AI B searched deeper."
+            )
+            efficiency = f"Across {len(result['history'])} plies they expanded {result['total_nodes']} nodes in {result['total_time']:.3f}s."
+            analysis_text = f"{verdict} {depth_note} {efficiency}"
+
+        return render_template(
+            "simulate.html",
+            selected_game=selected_game,
+            depth_a=depth_a,
+            depth_b=depth_b,
+            max_turns=max_turns,
+            result=result,
+            error=error,
+            analysis_text=analysis_text,
+        )
 
     @app.route("/reset")
     def reset():

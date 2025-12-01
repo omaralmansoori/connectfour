@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI vs AI Simulation Lab</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <div class="top-bar">
+      <div>
+        <h1>AI vs AI Simulation Lab</h1>
+        <p class="subtitle">Pit two minimax agents against each other in every game mode and observe how depth changes play.</p>
+      </div>
+      <div class="nav-buttons">
+        <div class="game-switcher">
+          <a href="{{ url_for('play') }}" class="btn secondary">🟡 Connect Four</a>
+          <a href="{{ url_for('tictactoe') }}" class="btn secondary">❌⭕ Tic-Tac-Toe</a>
+          <a href="{{ url_for('checkers') }}" class="btn secondary">♟️ Checkers</a>
+        </div>
+        <a href="{{ url_for('learn') }}" class="btn secondary">📚 Minimax Primer</a>
+      </div>
+    </div>
+
+    {% if error %}
+      <div class="status warning">{{ error }}</div>
+    {% endif %}
+
+    <div class="layout simulation-layout">
+      <div class="panel">
+        <h2>Configure the showdown</h2>
+        <p class="subtitle">Assign separate search depths to each AI to see how foresight translates into strength, speed, and style.</p>
+        <form method="post" class="sim-form">
+          <label for="game"><strong>Game</strong></label>
+          <select id="game" name="game">
+            <option value="connectfour" {% if selected_game == 'connectfour' %}selected{% endif %}>Connect Four</option>
+            <option value="tictactoe" {% if selected_game == 'tictactoe' %}selected{% endif %}>Tic-Tac-Toe</option>
+            <option value="checkers" {% if selected_game == 'checkers' %}selected{% endif %}>Checkers</option>
+          </select>
+
+          <div class="depth-pair">
+            <div class="depth-card">
+              <div class="label">AI A (plays as Human token)</div>
+              <input type="number" min="1" max="10" name="depth_a" value="{{ depth_a }}" />
+              <p class="subtitle">Higher depth lets AI A see further when acting as Player 1.</p>
+            </div>
+            <div class="depth-card">
+              <div class="label">AI B (plays as AI token)</div>
+              <input type="number" min="1" max="10" name="depth_b" value="{{ depth_b }}" />
+              <p class="subtitle">Tune AI B separately to compare computation vs. outcomes.</p>
+            </div>
+          </div>
+
+          <label for="max_turns"><strong>Max plies</strong> (4-200)</label>
+          <input type="number" id="max_turns" name="max_turns" min="4" max="200" value="{{ max_turns }}" />
+          <p class="subtitle">Stop runaway battles while still letting both sides play out their strategies.</p>
+
+          <button type="submit" class="btn" style="margin-top:12px;">Run simulation</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head" style="align-items:flex-start;">
+          <div>
+            <h2>Results &amp; analysis</h2>
+            <p class="subtitle">See every move, measure search cost, and compare which depth wins.</p>
+          </div>
+          <div class="pill">Interactive teaching view</div>
+        </div>
+
+        {% if result %}
+          <div class="insight-grid" style="margin-bottom:12px;">
+            <div class="stat">
+              <div class="label">Outcome</div>
+              <div class="value">
+                {% if result.winner is none %}Draw{% else %}{{ 'AI A' if result.winner.name == 'HUMAN' else 'AI B' }} wins{% endif %}
+              </div>
+              <div class="pill">{{ result.winner.name if result.winner else 'No winner' }}</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total plies</div>
+              <div class="value">{{ result.history|length }}</div>
+              <div class="pill">{{ 'Turn limit reached' if result.max_turns_hit else 'Finished naturally' }}</div>
+            </div>
+            <div class="stat">
+              <div class="label">Depths</div>
+              <div class="value">A: {{ result.depth_a }} | B: {{ result.depth_b }}</div>
+              <div class="pill">Adjust to probe search effort</div>
+            </div>
+            <div class="stat">
+              <div class="label">Total cost</div>
+              <div class="value">{{ result.total_nodes }} nodes</div>
+              <div class="pill">{{ '%.3f'|format(result.total_time) }}s cumulative</div>
+            </div>
+          </div>
+
+          {% if analysis_text %}
+            <div class="status">{{ analysis_text }}</div>
+          {% endif %}
+
+          <h3 style="margin-top:16px;">Final position</h3>
+          <div class="sim-board" style="grid-template-columns: repeat({{ result.cols }}, 1fr);">
+            {% for r in range(result.rows) %}
+              {% for c in range(result.cols) %}
+                {% set cell = result.final_board[r][c] %}
+                {% set role = 'empty' %}
+                {% if cell == 1 %}{% set role = 'human' %}{% elif cell == 2 %}{% set role = 'ai' %}{% elif cell == 3 %}{% set role = 'human-king' %}{% elif cell == 4 %}{% set role = 'ai-king' %}{% endif %}
+                <div class="sim-cell {{ role }} {{ 'checkers-cell' if result.game == 'checkers' else '' }}">
+                  {% if result.game == 'checkers' %}
+                    {% if cell in [1,3] %}<span class="checker-chip human {{ 'king' if cell in [3] else '' }}"></span>{% elif cell in [2,4] %}<span class="checker-chip ai {{ 'king' if cell in [4] else '' }}"></span>{% endif %}
+                  {% else %}
+                    <div class="disc {% if cell == 1 %}human{% elif cell == 2 %}ai{% endif %}"></div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+
+          <h3 style="margin-top:16px;">Move-by-move story</h3>
+          <div class="timeline">
+            {% for item in result.history %}
+              <div class="timeline-row">
+                <div class="timeline-step">#{{ item.turn }}</div>
+                <div class="timeline-player">{{ item.player }} <span class="pill">as {{ item.as_player }}</span></div>
+                <div class="timeline-move">{{ item.move }}</div>
+                <div class="timeline-metrics">{{ item.diagnostics.nodes_expanded }} nodes · {{ '%.3f'|format(item.diagnostics.duration_s) }}s</div>
+                {% if item.diagnostics.principal_variation %}
+                  <div class="timeline-pv">PV: {{ item.diagnostics.principal_variation | map('string') | join(', ') }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="subtitle">Choose a game, set depths for both agents, and run the match to see how deeper search affects accuracy and speed.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
