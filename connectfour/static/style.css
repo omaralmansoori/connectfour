@@ -56,11 +56,15 @@ a:hover { text-decoration: underline; }
   font-size: 13px; 
 }
 
-.layout { 
-  display: grid; 
-  grid-template-columns: 1.15fr 0.85fr; 
-  gap: 20px; 
-  margin-top: 20px; 
+.layout {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.simulation-layout {
+  grid-template-columns: 0.95fr 1.05fr;
 }
 
 .panel {
@@ -193,6 +197,12 @@ select, input[type=number], input[type=range] {
   color: #04101f;
   cursor: default;
   pointer-events: none;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .game-switcher {
@@ -736,8 +746,97 @@ select, input[type=number], input[type=range] {
   font-weight: 700;
 }
 
+.sim-form {
+  display: grid;
+  gap: 12px;
+}
+
+.depth-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.depth-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px dashed var(--panel-border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.sim-board {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.sim-cell {
+  min-height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(9, 17, 35, 0.35);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.sim-cell.checkers-cell {
+  background: rgba(9, 17, 35, 0.15);
+}
+
+.sim-cell.human-king, .sim-cell.ai-king {
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08);
+}
+
+.timeline {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.timeline-row {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.timeline-pv {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.timeline-step {
+  font-weight: 700;
+}
+
+.timeline-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeline-move {
+  color: var(--text);
+}
+
+.timeline-metrics {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 @media (max-width: 980px) {
   body { padding: 20px; }
   .layout { grid-template-columns: 1fr; }
   .board { justify-content: start; }
+  .nav-buttons { flex-direction: column; align-items: flex-start; }
+  .timeline-row { grid-template-columns: 1fr; }
 }
