@@ -3,66 +3,72 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Analysis - Connect Four</title>
+  <title>Checkers Insights</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='tree.css') }}" />
 </head>
 <body>
+  {% set files = ['A','B','C','D','E','F','G','H'] %}
   <div class="page">
-    <h1>AI Search Analysis</h1>
-    <p>Explore the minimax search tree with interactive visualization. See how the AI evaluates each possible move.</p>
-    <p><a href="{{ url_for('play') }}">← Back to game</a></p>
-    
-    <!-- Move History Navigator -->
+    <h1>AI Search Analysis - Checkers</h1>
+    <p class="subtitle">Review how the checkers AI weighs captures, promotions, and mobility using minimax with alpha-beta pruning.</p>
+    <p><a href="{{ url_for('checkers') }}">← Back to game</a></p>
+
     {% if history and history|length > 0 %}
-    <div class="panel" style="margin-bottom: 20px;">
-      <h2>🕐 Move History</h2>
-      <p class="subtitle">Review how the AI made decisions at each step of the game.</p>
-      <div class="move-history-nav">
-        <div class="history-controls">
-          {% if selected_move > 1 %}
-            <a href="{{ url_for('analysis', move=1) }}" class="history-btn" title="First move">⏮</a>
-            <a href="{{ url_for('analysis', move=selected_move - 1) }}" class="history-btn" title="Previous move">◀</a>
-          {% else %}
-            <span class="history-btn disabled">⏮</span>
-            <span class="history-btn disabled">◀</span>
-          {% endif %}
-          
-          <div class="history-selector">
-            <select id="moveSelector" onchange="window.location.href='{{ url_for('analysis') }}?move=' + this.value">
-              {% for entry in history %}
-                <option value="{{ entry.move_num }}" {% if entry.move_num == selected_move %}selected{% endif %}>
-                  AI Move #{{ entry.move_num }} → Column {{ entry.ai_move }}
-                </option>
-              {% endfor %}
-            </select>
+      <div class="panel" style="margin-bottom: 20px;">
+        <h2>🕐 Move History</h2>
+        <p class="subtitle">Inspect any AI move from the match and compare its root evaluations.</p>
+        <div class="move-history-nav">
+          <div class="history-controls">
+            {% if selected_move > 1 %}
+              <a href="{{ url_for('checkers_analysis', move=1) }}" class="history-btn" title="First move">⏮</a>
+              <a href="{{ url_for('checkers_analysis', move=selected_move - 1) }}" class="history-btn" title="Previous move">◀</a>
+            {% else %}
+              <span class="history-btn disabled">⏮</span>
+              <span class="history-btn disabled">◀</span>
+            {% endif %}
+
+            <div class="history-selector">
+              <select id="moveSelector" onchange="window.location.href='{{ url_for('checkers_analysis') }}?move=' + this.value">
+                {% for entry in history %}
+                  {% set mv = entry.ai_move %}
+                  {% set s = mv.path[0] %}{% set e = mv.path[-1] %}
+                  <option value="{{ entry.move_num }}" {% if entry.move_num == selected_move %}selected{% endif %}>
+                    AI Move #{{ entry.move_num }} → {{ files[s[1]] }}{{ s[0] + 1 }}→{{ files[e[1]] }}{{ e[0] + 1 }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            {% if selected_move < total_moves %}
+              <a href="{{ url_for('checkers_analysis', move=selected_move + 1) }}" class="history-btn" title="Next move">▶</a>
+              <a href="{{ url_for('checkers_analysis', move=total_moves) }}" class="history-btn" title="Latest move">⏭</a>
+            {% else %}
+              <span class="history-btn disabled">▶</span>
+              <span class="history-btn disabled">⏭</span>
+            {% endif %}
           </div>
-          
-          {% if selected_move < total_moves %}
-            <a href="{{ url_for('analysis', move=selected_move + 1) }}" class="history-btn" title="Next move">▶</a>
-            <a href="{{ url_for('analysis', move=total_moves) }}" class="history-btn" title="Latest move">⏭</a>
-          {% else %}
-            <span class="history-btn disabled">▶</span>
-            <span class="history-btn disabled">⏭</span>
-          {% endif %}
-        </div>
-        <div class="history-info">
-          Viewing move <strong>{{ selected_move }}</strong> of <strong>{{ total_moves }}</strong>
+          <div class="history-info">
+            Viewing move <strong>{{ selected_move }}</strong> of <strong>{{ total_moves }}</strong>
+          </div>
         </div>
       </div>
-    </div>
     {% endif %}
-    
-    <!-- Board State Section -->
+
     <div class="panel" style="margin-bottom: 20px;">
       <h2>Board State {% if selected_move %}(After AI Move #{{ selected_move }}){% endif %}</h2>
-      <div class="board-small">
-        {% for r in range(board|length) %}
-          {% for c in cols %}
+      <div class="checkers-board mini">
+        {% for r in range(8) %}
+          {% for c in range(8) %}
             {% set cell = board[r][c] %}
-            {% set color = '' %}
-            {% if cell == 1 %}{% set color = 'human' %}{% elif cell == 2 %}{% set color = 'ai' %}{% endif %}
-            <div class="cell-small"><div class="disc-small {{ color }}"></div></div>
+            {% set dark = (r + c) % 2 == 1 %}
+            <div class="checker-square {{ 'dark' if dark else 'light' }}">
+              {% if cell != 0 %}
+                {% set owner = 'human' if cell in [1,3] else 'ai' %}
+                {% set crowned = cell in [3,4] %}
+                <div class="checker-piece {{ owner }}{% if crowned %} king{% endif %}">{% if crowned %}K{% endif %}</div>
+              {% endif %}
+            </div>
           {% endfor %}
         {% endfor %}
       </div>
@@ -91,8 +97,9 @@
           <h3>Root Move Evaluations</h3>
           <div class="move-list">
             {% for move in diag.evaluated_moves %}
+              {% set s = move.move.path[0] %}{% set e = move.move.path[-1] %}
               <div class="move-item">
-                <span class="move-col">Column {{ move.move }}</span>
+                <span class="move-col">{{ files[s[1]] }}{{ s[0] + 1 }}→{{ files[e[1]] }}{{ e[0] + 1 }}</span>
                 <span class="move-score" data-score="{{ move.score }}">Score: {{ move.score }}</span>
               </div>
             {% endfor %}
@@ -113,14 +120,13 @@
           </div>
           <div class="legend-item">
             <span class="legend-box best-path"></span>
-            <span>Principal Variation (Best Line)</span>
+            <span>Principal Variation (Best Path)</span>
           </div>
         </div>
       </div>
       {% endif %}
     </div>
 
-    <!-- Search Tree Section -->
     <div class="panel tree-panel">
       <h2>Minimax Search Tree</h2>
       {% if diag %}
@@ -147,6 +153,7 @@
     const treeData = {{ diag.search_tree|tojson|safe }};
     const principalVariation = {{ diag.principal_variation|tojson|safe }};
     const evaluatedMovesData = {{ diag.evaluated_moves|tojson|safe }};
+    const gameTypeData = 'checkers';
   </script>
   <script src="{{ url_for('static', filename='tree.js') }}"></script>
   {% endif %}

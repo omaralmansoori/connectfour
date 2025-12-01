@@ -26,7 +26,7 @@ class TicTacToeBoard:
         row, col = divmod(move, self.cols)
         return 0 <= row < self.rows and 0 <= col < self.cols and self.grid[row][col] == 0
 
-    def valid_moves(self) -> List[int]:
+    def valid_moves(self, *_: Player) -> List[int]:
         return [idx for idx in range(self.rows * self.cols) if self.is_valid_move(idx)]
 
     def drop_piece(self, move: int, player: Player) -> Optional[MoveResult]:

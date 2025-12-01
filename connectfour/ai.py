@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MoveEvaluation:
-    column: int
+    move: Any
     score: int
 
 
@@ -23,12 +23,12 @@ class SearchDiagnostics:
     duration_s: float
     nodes_expanded: int
     search_tree: "SearchNode"
-    principal_variation: List[int]
+    principal_variation: List[Any]
 
 
 @dataclass
 class SearchNode:
-    column: Optional[int]
+    move: Any
     score: int
     depth: int
     maximizing: bool
@@ -42,10 +42,26 @@ class MinimaxAI:
         self.depth = depth
         self._custom_evaluator = evaluator
 
-    def choose_move(self, board: Board, player: Player = Player.AI) -> Tuple[int, SearchDiagnostics]:
+    def choose_move(self, board: Board, player: Player = Player.AI) -> Tuple[Any, SearchDiagnostics]:
         start = time.perf_counter()
         evaluations: List[MoveEvaluation] = []
         nodes_expanded = 0
+
+        def serialize_move(move: Any) -> Any:
+            if hasattr(move, "as_dict"):
+                return move.as_dict()  # type: ignore[no-any-return]
+            return move
+
+        def valid_moves(state: Board, current_player: Player) -> List[Any]:
+            """Return valid moves for the given player, supporting boards that accept an argument.
+
+            Connect Four/Tic-Tac-Toe ignore the player, while Checkers needs it for directional moves.
+            """
+
+            try:
+                return state.valid_moves(current_player)  # type: ignore[arg-type]
+            except TypeError:
+                return state.valid_moves()
 
         def minimax(
             state: Board,
@@ -53,13 +69,13 @@ class MinimaxAI:
             maximizing: bool,
             alpha: float,
             beta: float,
-            move_from_parent: Optional[int] = None,
-        ) -> Tuple[int, Optional[int], SearchNode]:
+            move_from_parent: Optional[Any] = None,
+        ) -> Tuple[int, Optional[Any], SearchNode]:
             nonlocal nodes_expanded
             nodes_expanded += 1
             game_over, winner = state.game_over()
             node = SearchNode(
-                column=move_from_parent,
+                move=serialize_move(move_from_parent),
                 score=0,
                 depth=self.depth - depth,
                 maximizing=maximizing,
@@ -70,22 +86,23 @@ class MinimaxAI:
                 node.score = eval_score
                 return eval_score, None, node
 
-            valid = state.valid_moves()
+            current_player = player if maximizing else Player.HUMAN if player == Player.AI else Player.AI
+            valid = valid_moves(state, current_player)
             if maximizing:
                 value = -float("inf")
-                best_move: Optional[int] = None
-                for col in valid:
+                best_move: Optional[Any] = None
+                for move in valid:
                     child = state.clone()
-                    child.drop_piece(col, player)
+                    child.drop_piece(move, player)
                     score, _, child_node = minimax(
-                        child, depth - 1, False, alpha, beta, move_from_parent=col
+                        child, depth - 1, False, alpha, beta, move_from_parent=move
                     )
                     node.children.append(child_node)
                     if depth == self.depth:
-                        evaluations.append(MoveEvaluation(column=col, score=score))
+                        evaluations.append(MoveEvaluation(move=serialize_move(move), score=score))
                     if score > value:
                         value = score
-                        best_move = col
+                        best_move = move
                     alpha = max(alpha, value)
                     if alpha >= beta:
                         break
@@ -95,16 +112,16 @@ class MinimaxAI:
                 value = float("inf")
                 best_move = None
                 opp = Player.HUMAN if player == Player.AI else Player.AI
-                for col in valid:
+                for move in valid:
                     child = state.clone()
-                    child.drop_piece(col, opp)
+                    child.drop_piece(move, opp)
                     score, _, child_node = minimax(
-                        child, depth - 1, True, alpha, beta, move_from_parent=col
+                        child, depth - 1, True, alpha, beta, move_from_parent=move
                     )
                     node.children.append(child_node)
                     if score < value:
                         value = score
-                        best_move = col
+                        best_move = move
                     beta = min(beta, value)
                     if alpha >= beta:
                         break
@@ -119,8 +136,8 @@ class MinimaxAI:
             valid_moves = board.valid_moves()
             move = valid_moves[0] if valid_moves else -1
 
-        def principal_variation(node: SearchNode) -> List[int]:
-            variation: List[int] = []
+        def principal_variation(node: SearchNode) -> List[Any]:
+            variation: List[Any] = []
             current = node
             while current.children:
                 best_child: Optional[SearchNode] = None
@@ -136,9 +153,9 @@ class MinimaxAI:
                         if child.score == best_score:
                             best_child = child
                             break
-                if best_child is None or best_child.column is None:
+                if best_child is None or best_child.move is None:
                     break
-                variation.append(best_child.column)
+                variation.append(best_child.move)
                 current = best_child
             return variation
 

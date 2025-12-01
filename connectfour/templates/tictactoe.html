@@ -17,6 +17,7 @@
         <div class="game-switcher">
           <a href="{{ url_for('play') }}" class="btn secondary">🟡 Connect Four</a>
           <span class="btn active">❌⭕ Tic-Tac-Toe</span>
+          <a href="{{ url_for('checkers') }}" class="btn secondary">♟️ Checkers</a>
         </div>
         <a href="{{ url_for('learn') }}" class="btn secondary">📚 Minimax Primer</a>
       </div>
@@ -124,7 +125,7 @@
           {% if last_diag and last_diag.evaluated_moves %}
             <ul class="list">
               {% for ev in last_diag.evaluated_moves %}
-                <li>Cell ({{ (ev.column // size) + 1 }}, {{ (ev.column % size) + 1 }}): <strong>{{ ev.score }}</strong></li>
+                <li>Cell ({{ (ev.move // size) + 1 }}, {{ (ev.move % size) + 1 }}): <strong>{{ ev.score }}</strong></li>
               {% endfor %}
             </ul>
           {% else %}
@@ -138,11 +139,11 @@
             <div class="tree">
               {% for child in last_diag.search_tree.children[:5] %}
                 <div class="tree-node">
-                  <div class="tree-label">AI tries ({{ (child.column // size) + 1 }}, {{ (child.column % size) + 1 }}) → score {{ child.score }}</div>
+                  <div class="tree-label">AI tries ({{ (child.move // size) + 1 }}, {{ (child.move % size) + 1 }}) → score {{ child.score }}</div>
                   <div class="tree-children">
                     {% for reply in child.children[:4] %}
                       <div class="tree-node depth">
-                        <div class="tree-label">Human replies ({{ (reply.column // size) + 1 }}, {{ (reply.column % size) + 1 }}) → {{ reply.score }}</div>
+                        <div class="tree-label">Human replies ({{ (reply.move // size) + 1 }}, {{ (reply.move % size) + 1 }}) → {{ reply.score }}</div>
                       </div>
                     {% else %}
                       <div class="tree-label">Leaf node reached</div>
