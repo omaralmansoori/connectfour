@@ -3,171 +3,362 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Checkers Analyst</title>
+  <title>Checkers</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
   {% set files = ['A','B','C','D','E','F','G','H'] %}
   <div class="page">
-    <div class="top-bar">
-      <div>
-        <h1>Checkers Analyst</h1>
-        <p class="subtitle">Play full American checkers with forced captures, promotion to kings, and AI search diagnostics.</p>
+    <!-- Header -->
+    <div class="checkers-header">
+      <div class="header-left">
+        <h1>♟️ Checkers</h1>
+        <p class="subtitle">Click a piece to see its moves, then click a destination to play</p>
       </div>
-      <div class="nav-buttons">
+      <div class="header-right">
         <div class="game-switcher">
           <a href="{{ url_for('play') }}" class="btn secondary">🟡 Connect Four</a>
           <a href="{{ url_for('tictactoe') }}" class="btn secondary">❌⭕ Tic-Tac-Toe</a>
           <span class="btn active">♟️ Checkers</span>
         </div>
-        <a href="{{ url_for('simulate') }}" class="btn secondary">🤝 AI vs AI</a>
-        <a href="{{ url_for('learn') }}" class="btn secondary">📚 Minimax Primer</a>
       </div>
+    </div>
+
+    <!-- Game Status Bar -->
+    <div class="game-status-bar">
+      <div class="status-item {% if human_turn and not game_over %}active{% endif %}">
+        <span class="checker-indicator human"></span>
+        <span>Your Turn</span>
+      </div>
+      <div class="status-divider">vs</div>
+      <div class="status-item {% if not human_turn and not game_over %}active{% endif %}">
+        <span class="checker-indicator ai"></span>
+        <span>AI (Depth {{ ai_depth }})</span>
+      </div>
+      {% if game_over %}
+        <div class="status-badge game-over">Game Over</div>
+      {% elif human_turn %}
+        <div class="status-badge your-move">Select a piece</div>
+      {% else %}
+        <div class="status-badge ai-thinking">AI thinking...</div>
+      {% endif %}
     </div>
 
     {% if message %}
-      <div class="status{% if game_over %} warning{% endif %}">{{ message }}</div>
+      <div class="game-message{% if game_over %} warning{% endif %}">{{ message }}</div>
     {% endif %}
 
-    <div class="layout">
-      <div class="panel">
-        <div class="panel-head">
-          <h2>Play Checkers</h2>
-          <div class="legend">
-            <span><span class="checker-chip human"></span>Human (men / kings)</span>
-            <span><span class="checker-chip ai"></span>AI (men / kings)</span>
+    <!-- Main Game Area -->
+    <div class="checkers-game-layout">
+      <!-- Board Section -->
+      <div class="board-section">
+        <div class="board-container">
+          <!-- Column labels top -->
+          <div class="board-labels-top">
+            {% for f in files %}<span>{{ f }}</span>{% endfor %}
           </div>
-        </div>
-
-        <div class="checkers-wrapper">
-          <div class="checkers-board">
-            {% for r in range(8) %}
-              {% for c in range(8) %}
-                {% set cell = board[r][c] %}
-                {% set dark = (r + c) % 2 == 1 %}
-                {% set is_last_ai = last_ai_move and last_ai_move[0] == r and last_ai_move[1] == c %}
-                <div class="checker-square {{ 'dark' if dark else 'light' }}{% if is_last_ai %} last-move{% endif %}">
-                  {% if cell != 0 %}
-                    {% set owner = 'human' if cell in [1,3] else 'ai' %}
-                    {% set crowned = cell in [3,4] %}
-                    <div class="checker-piece {{ owner }}{% if crowned %} king{% endif %}">
-                      {% if crowned %}K{% endif %}
-                    </div>
-                  {% endif %}
-                </div>
+          
+          <div class="board-with-rows">
+            <!-- Row labels left -->
+            <div class="board-labels-side">
+              {% for r in range(8) %}<span>{{ r + 1 }}</span>{% endfor %}
+            </div>
+            
+            <!-- The Board -->
+            <div class="checkers-board-interactive" id="checkersBoard">
+              {% for r in range(8) %}
+                {% for c in range(8) %}
+                  {% set cell = board[r][c] %}
+                  {% set dark = (r + c) % 2 == 1 %}
+                  {% set is_last_ai = last_ai_move and last_ai_move[0] == r and last_ai_move[1] == c %}
+                  {% set has_piece = cell != 0 %}
+                  {% set is_human_piece = cell in [1, 3] %}
+                  <div class="checker-cell {{ 'dark' if dark else 'light' }}{% if is_last_ai %} last-ai-move{% endif %}" 
+                       data-row="{{ r }}" data-col="{{ c }}"
+                       {% if is_human_piece and human_turn and not game_over %}data-selectable="true"{% endif %}>
+                    {% if has_piece %}
+                      {% set owner = 'human' if cell in [1,3] else 'ai' %}
+                      {% set crowned = cell in [3,4] %}
+                      <div class="checker-piece-interactive {{ owner }}{% if crowned %} king{% endif %}{% if is_human_piece and human_turn and not game_over %} selectable{% endif %}">
+                        {% if crowned %}<span class="crown">♔</span>{% endif %}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
               {% endfor %}
-            {% endfor %}
+            </div>
+            
+            <!-- Row labels right -->
+            <div class="board-labels-side">
+              {% for r in range(8) %}<span>{{ r + 1 }}</span>{% endfor %}
+            </div>
           </div>
-          <div class="checkers-controls">
-            <div class="status-grid">
-              <div>
-                <div class="label">Turn</div>
-                <div class="value">{{ 'Human' if human_turn else 'AI' }}</div>
-                <div class="pill">Captures are mandatory</div>
-              </div>
-              <div>
-                <div class="label">AI depth</div>
-                <div class="value">{{ ai_depth }} ply</div>
-                <div class="pill">Deeper explores more jumps</div>
-              </div>
-              <div>
-                <div class="label">Game state</div>
-                <div class="value">{% if game_over %}Game over{% else %}In progress{% endif %}</div>
-                <div class="pill">Reset anytime to start fresh</div>
-              </div>
-            </div>
-
-            <div class="controls">
-              <form method="post" class="depth-inline">
-                <input type="hidden" name="action" value="set_depth" />
-                <label for="depth"><strong>Depth</strong> (2-6):</label>
-                <input type="range" id="depth" name="depth" min="2" max="6" value="{{ ai_depth }}" oninput="depthValue.innerText=this.value" />
-                <span id="depthValue" class="pill">{{ ai_depth }}</span>
-                <button class="btn" type="submit">Update</button>
-              </form>
-              <form method="post">
-                <input type="hidden" name="action" value="ai_start" />
-                <button class="btn secondary" type="submit">🤖 Let AI start</button>
-              </form>
-              <a href="{{ url_for('checkers_reset') }}" class="btn secondary">Reset</a>
-              <a href="{{ url_for('checkers_analysis') }}" class="btn secondary">🔍 Insights</a>
-            </div>
-
-            <div class="concept-section">
-              <h3>Available moves</h3>
-              {% if human_turn and human_moves %}
-                <div class="move-grid">
-                  {% for move in human_moves %}
-                    {% set start = move.path[0] %}
-                    {% set end = move.path[-1] %}
-                    {% set capture = move.captures|length > 0 %}
-                    <form method="post" class="move-card">
-                      <input type="hidden" name="action" value="move" />
-                      <input type="hidden" name="move_index" value="{{ loop.index0 }}" />
-                      <div class="move-title">{{ files[start[1]] }}{{ start[0] + 1 }} → {{ files[end[1]] }}{{ end[0] + 1 }}</div>
-                      <div class="subtitle">{{ 'Capture sequence' if capture else 'Simple step' }}{% if move.promotes %} · Promotes{% endif %}</div>
-                      {% if capture %}
-                        <div class="pill">{{ move.captures|length }} piece{{ 's' if move.captures|length > 1 else '' }} taken</div>
-                      {% endif %}
-                      <button class="btn" type="submit">Play move</button>
-                    </form>
-                  {% endfor %}
-                </div>
-              {% elif not human_turn %}
-                <p class="subtitle">Waiting for the AI to complete its move.</p>
-              {% else %}
-                <p class="subtitle">No legal moves available.</p>
-              {% endif %}
-            </div>
+          
+          <!-- Column labels bottom -->
+          <div class="board-labels-top">
+            {% for f in files %}<span>{{ f }}</span>{% endfor %}
           </div>
         </div>
 
-        {% if game_over %}
-          <div class="status warning" style="margin-top:12px;">Game over. Reset or let the AI start a new match.</div>
-        {% endif %}
+        <!-- Legend -->
+        <div class="piece-legend">
+          <div class="legend-entry">
+            <span class="checker-mini human"></span>
+            <span>Your pieces</span>
+          </div>
+          <div class="legend-entry">
+            <span class="checker-mini ai"></span>
+            <span>AI pieces</span>
+          </div>
+          <div class="legend-entry">
+            <span class="checker-mini human king">♔</span>
+            <span>Kings</span>
+          </div>
+          <div class="legend-entry highlight">
+            <span class="move-dot"></span>
+            <span>Valid move</span>
+          </div>
+        </div>
       </div>
 
-      <div class="panel">
-        <h2>Strategy insight</h2>
-        <p class="subtitle">The evaluator tracks material, mobility, and central control. Promotions to kings swing the score heavily.</p>
-        <ul class="list">
-          <li><strong>Material:</strong> Kings are worth more than men; trades that create a king are favored.</li>
-          <li><strong>Mobility:</strong> Every extra legal move adds pressure. Cornered pieces reduce the score.</li>
-          <li><strong>Center:</strong> Occupying the middle squares adds stability and options for forks.</li>
-        </ul>
-        {% if last_diag %}
-          <div class="insight-grid">
-            <div class="stat">
-              <div class="label">Nodes expanded</div>
-              <div class="value">{{ last_diag.nodes_expanded }}</div>
-              <div class="pill">Alpha-beta pruning trims bad lines</div>
-            </div>
-            <div class="stat">
-              <div class="label">Search time</div>
-              <div class="value">{{ '%.3f'|format(last_diag.duration_s) }}s</div>
-              <div class="pill">Depth {{ last_diag.search_depth }} with captures</div>
-            </div>
-            <div class="stat">
-              <div class="label">Principal variation</div>
-              <div class="value">
-                {% for mv in last_diag.principal_variation %}
-                  {% set s = mv.path[0] %}{% set e = mv.path[-1] %}
-                  <span class="pill">{{ files[s[1]] }}{{ s[0] + 1 }}→{{ files[e[1]] }}{{ e[0] + 1 }}</span>
-                {% else %}
-                  —
-                {% endfor %}
+      <!-- Controls & Info Section -->
+      <div class="controls-section">
+        <!-- Quick Actions -->
+        <div class="action-panel">
+          <h3>⚡ Quick Actions</h3>
+          <div class="action-buttons">
+            <a href="{{ url_for('checkers_reset') }}" class="action-btn reset">
+              <span class="action-icon">🔄</span>
+              <span>New Game</span>
+            </a>
+            <form method="post" style="display:contents;">
+              <input type="hidden" name="action" value="ai_start" />
+              <button type="submit" class="action-btn ai-start" {% if not game_over and board|string != board|string %}disabled{% endif %}>
+                <span class="action-icon">🤖</span>
+                <span>AI First</span>
+              </button>
+            </form>
+            <a href="{{ url_for('checkers_analysis') }}" class="action-btn analysis">
+              <span class="action-icon">📊</span>
+              <span>View Analysis</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- AI Difficulty -->
+        <div class="settings-panel">
+          <h3>🎯 AI Difficulty</h3>
+          <form method="post" class="difficulty-form">
+            <input type="hidden" name="action" value="set_depth" />
+            <div class="difficulty-slider">
+              <input type="range" id="depth" name="depth" min="2" max="6" value="{{ ai_depth }}" 
+                     oninput="updateDifficultyLabel(this.value)" />
+              <div class="difficulty-labels">
+                <span>Easy</span>
+                <span>Medium</span>
+                <span>Hard</span>
               </div>
-              <div class="pill">Best line assuming perfect play</div>
+            </div>
+            <div class="difficulty-display">
+              <span id="difficultyText">{{ ['', '', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert'][ai_depth] }}</span>
+              <span class="depth-value">Depth: <strong id="depthValue">{{ ai_depth }}</strong></span>
+            </div>
+            <button class="btn" type="submit">Apply</button>
+          </form>
+        </div>
+
+        <!-- Available Moves -->
+        <div class="moves-panel">
+          <h3>📋 Available Moves <span class="move-count">{{ human_moves|length if human_turn else 0 }}</span></h3>
+          {% if human_turn and human_moves and not game_over %}
+            <p class="moves-hint">Click a piece on the board, or select a move below:</p>
+            <div class="moves-list">
+              {% for move in human_moves %}
+                {% set start = move.path[0] %}
+                {% set end = move.path[-1] %}
+                {% set capture = move.captures|length > 0 %}
+                <form method="post" class="move-option" data-start-row="{{ start[0] }}" data-start-col="{{ start[1] }}"
+                      data-end-row="{{ end[0] }}" data-end-col="{{ end[1] }}">
+                  <input type="hidden" name="action" value="move" />
+                  <input type="hidden" name="move_index" value="{{ loop.index0 }}" />
+                  <button type="submit" class="move-btn {% if capture %}capture{% endif %}">
+                    <span class="move-notation">{{ files[start[1]] }}{{ start[0] + 1 }} → {{ files[end[1]] }}{{ end[0] + 1 }}</span>
+                    {% if capture %}
+                      <span class="capture-badge">⚔️ {{ move.captures|length }}</span>
+                    {% endif %}
+                    {% if move.promotes %}
+                      <span class="promote-badge">👑</span>
+                    {% endif %}
+                  </button>
+                </form>
+              {% endfor %}
+            </div>
+          {% elif game_over %}
+            <p class="moves-empty">Game has ended. Start a new game to play again!</p>
+          {% elif not human_turn %}
+            <div class="ai-waiting">
+              <div class="thinking-animation"></div>
+              <span>AI is calculating...</span>
+            </div>
+          {% else %}
+            <p class="moves-empty">No moves available.</p>
+          {% endif %}
+        </div>
+
+        <!-- Last AI Move Info -->
+        {% if last_diag %}
+        <div class="ai-insight-panel">
+          <h3>🧠 AI's Last Move</h3>
+          <div class="insight-stats">
+            <div class="insight-stat">
+              <span class="stat-label">Positions analyzed</span>
+              <span class="stat-value">{{ last_diag.nodes_expanded|default(0) }}</span>
+            </div>
+            <div class="insight-stat">
+              <span class="stat-label">Think time</span>
+              <span class="stat-value">{{ '%.2f'|format(last_diag.duration_s) }}s</span>
             </div>
           </div>
-        {% else %}
-          <div class="subtitle">Make a move to populate the diagnostics. The AI will show its reasoning immediately.</div>
+          <a href="{{ url_for('checkers_analysis') }}" class="insight-link">
+            View full analysis →
+          </a>
+        </div>
         {% endif %}
-        <div class="key-point">
-          <strong>Teaching tip:</strong> Try setting the depth to 2, then 6. The branching factor from captures makes deeper searches grow quickly.
+
+        <!-- Game Rules -->
+        <div class="rules-panel collapsed" id="rulesPanel">
+          <button class="rules-toggle" onclick="toggleRules()">
+            <span>📖 Game Rules</span>
+            <span class="toggle-icon">▼</span>
+          </button>
+          <div class="rules-content">
+            <ul>
+              <li><strong>Movement:</strong> Pieces move diagonally on dark squares</li>
+              <li><strong>Captures:</strong> Jump over opponent pieces to capture them (mandatory!)</li>
+              <li><strong>Kings:</strong> Reach the opposite end to become a king (can move backwards)</li>
+              <li><strong>Win:</strong> Capture all opponent pieces or block all their moves</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Navigation -->
+    <div class="bottom-nav">
+      <a href="{{ url_for('simulate') }}" class="nav-link">🤝 Watch AI vs AI</a>
+      <a href="{{ url_for('learn') }}" class="nav-link">📚 Learn Minimax</a>
+    </div>
   </div>
+
+  <script>
+    // Store moves data for interactive board
+    const movesData = [
+      {% for move in human_moves %}
+      {
+        index: {{ loop.index0 }},
+        path: {{ move.path|tojson }},
+        captures: {{ move.captures|tojson }},
+        promotes: {{ move.promotes|tojson }}
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+    
+    let selectedPiece = null;
+    let highlightedCells = [];
+    
+    function clearHighlights() {
+      document.querySelectorAll('.checker-cell.highlight, .checker-cell.selected, .checker-cell.capture-target').forEach(cell => {
+        cell.classList.remove('highlight', 'selected', 'capture-target');
+      });
+      highlightedCells = [];
+    }
+    
+    function selectPiece(row, col) {
+      clearHighlights();
+      
+      const cell = document.querySelector(`.checker-cell[data-row="${row}"][data-col="${col}"]`);
+      if (!cell || !cell.dataset.selectable) return;
+      
+      cell.classList.add('selected');
+      selectedPiece = { row, col };
+      
+      // Find moves for this piece
+      const pieceMoves = movesData.filter(m => m.path[0][0] === row && m.path[0][1] === col);
+      
+      pieceMoves.forEach(move => {
+        const endRow = move.path[move.path.length - 1][0];
+        const endCol = move.path[move.path.length - 1][1];
+        const targetCell = document.querySelector(`.checker-cell[data-row="${endRow}"][data-col="${endCol}"]`);
+        if (targetCell) {
+          targetCell.classList.add('highlight');
+          if (move.captures.length > 0) {
+            targetCell.classList.add('capture-target');
+          }
+          targetCell.dataset.moveIndex = move.index;
+          highlightedCells.push(targetCell);
+        }
+      });
+    }
+    
+    function playMove(moveIndex) {
+      const form = document.querySelector(`form.move-option input[name="move_index"][value="${moveIndex}"]`);
+      if (form) {
+        form.closest('form').submit();
+      }
+    }
+    
+    // Click handlers
+    document.querySelectorAll('.checker-cell').forEach(cell => {
+      cell.addEventListener('click', function() {
+        const row = parseInt(this.dataset.row);
+        const col = parseInt(this.dataset.col);
+        
+        // If clicking a highlighted cell, play the move
+        if (this.classList.contains('highlight')) {
+          playMove(parseInt(this.dataset.moveIndex));
+          return;
+        }
+        
+        // If clicking a selectable piece, select it
+        if (this.dataset.selectable) {
+          selectPiece(row, col);
+        } else {
+          clearHighlights();
+          selectedPiece = null;
+        }
+      });
+    });
+    
+    // Hover effects on move list
+    document.querySelectorAll('.move-option').forEach(form => {
+      form.addEventListener('mouseenter', function() {
+        clearHighlights();
+        const startRow = parseInt(this.dataset.startRow);
+        const startCol = parseInt(this.dataset.startCol);
+        const endRow = parseInt(this.dataset.endRow);
+        const endCol = parseInt(this.dataset.endCol);
+        
+        const startCell = document.querySelector(`.checker-cell[data-row="${startRow}"][data-col="${startCol}"]`);
+        const endCell = document.querySelector(`.checker-cell[data-row="${endRow}"][data-col="${endCol}"]`);
+        
+        if (startCell) startCell.classList.add('selected');
+        if (endCell) endCell.classList.add('highlight');
+      });
+      
+      form.addEventListener('mouseleave', clearHighlights);
+    });
+    
+    // Difficulty slider
+    function updateDifficultyLabel(value) {
+      const labels = ['', '', 'Beginner', 'Easy', 'Medium', 'Hard', 'Expert'];
+      document.getElementById('difficultyText').textContent = labels[value];
+      document.getElementById('depthValue').textContent = value;
+    }
+    
+    // Rules toggle
+    function toggleRules() {
+      document.getElementById('rulesPanel').classList.toggle('collapsed');
+    }
+  </script>
 </body>
 </html>
