@@ -37,7 +37,7 @@ class Board:
     def is_valid_move(self, col: int) -> bool:
         return 0 <= col < self.cols and self.grid[0][col] == 0
 
-    def valid_moves(self) -> List[int]:
+    def valid_moves(self, *_: Player) -> List[int]:
         return [c for c in range(self.cols) if self.is_valid_move(c)]
 
     def drop_piece(self, col: int, player: Player) -> Optional[MoveResult]:

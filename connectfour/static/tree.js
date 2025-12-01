@@ -5,7 +5,7 @@ class TreeVisualizer {
     this.principalVariation = principalVariation || [];
     this.evaluatedMoves = evaluatedMoves || [];
     this.container = document.getElementById('treeContainer');
-    this.gameType = gameType; // 'connectfour' or 'tictactoe'
+    this.gameType = gameType; // 'connectfour', 'tictactoe', or 'checkers'
     this.showScores = true;
     this.highlightBest = true;
     this.showBestOnly = true;
@@ -25,12 +25,34 @@ class TreeVisualizer {
   
   // Format move label based on game type
   formatMove(move) {
+    if (move === null || move === undefined) return '—';
     if (this.gameType === 'tictactoe') {
       const row = Math.floor(move / 3) + 1;
       const col = (move % 3) + 1;
       return `Cell (${row},${col})`;
     }
+    if (this.gameType === 'checkers') {
+      const path = move?.path;
+      if (Array.isArray(path) && path.length >= 2) {
+        const start = path[0];
+        const end = path[path.length - 1];
+        const captureHint = move.captures && move.captures.length > 0 ? ' (capture)' : '';
+        return `${String.fromCharCode(65 + start[1])}${start[0] + 1}→${String.fromCharCode(65 + end[1])}${end[0] + 1}${captureHint}`;
+      }
+      return 'Move';
+    }
     return `Column ${move}`;
+  }
+
+  movesEqual(a, b) {
+    if (this.gameType === 'checkers') {
+      try {
+        return JSON.stringify(a) === JSON.stringify(b);
+      } catch (err) {
+        return false;
+      }
+    }
+    return a === b;
   }
   
   setupControls() {
@@ -62,8 +84,8 @@ class TreeVisualizer {
   
   // Generate a unique path identifier for a node
   getNodePath(node, level, parentPath = '') {
-    const col = node.column !== null && node.column !== undefined ? node.column : 'root';
-    return parentPath ? `${parentPath}-${col}` : `${col}`;
+    const label = node.move !== null && node.move !== undefined ? this.formatMove(node.move) : 'root';
+    return parentPath ? `${parentPath}-${label}` : `${label}`;
   }
   
   // Toggle collapse state for a node
@@ -87,9 +109,9 @@ class TreeVisualizer {
       
       // Determine if this node is in the principal variation
       const nodeInPV = level === 0 || (
-        level > 0 && 
-        this.principalVariation.length >= level && 
-        node.column === this.principalVariation[level - 1]
+        level > 0 &&
+        this.principalVariation.length >= level &&
+        this.movesEqual(node.move, this.principalVariation[level - 1])
       );
       
       const inBest = isInBestPath && nodeInPV;
@@ -218,7 +240,7 @@ class TreeVisualizer {
     `;
     
     const bestMove = this.principalVariation.length > 0 ? this.principalVariation[0] : null;
-    const bestEval = this.evaluatedMoves.find(m => m.column === bestMove);
+    const bestEval = this.evaluatedMoves.find(m => this.movesEqual(m.move, bestMove));
     const bestScore = bestEval ? bestEval.score : 'N/A';
     const bestMoveLabel = bestMove !== null ? this.formatMove(bestMove) : 'N/A';
     
@@ -286,9 +308,9 @@ class TreeVisualizer {
     nodeEl.style.left = (nodeInfo.x + 30) + 'px';
     nodeEl.style.top = (nodeInfo.y + 30) + 'px';
     
-    const moveDesc = nodeInfo.level === 0 
-      ? '🎯 Current State' 
-      : `${isAITurn ? '🤖' : '👤'} ${this.formatMove(node.column)}`;
+    const moveDesc = nodeInfo.level === 0
+      ? '🎯 Current State'
+      : `${isAITurn ? '🤖' : '👤'} ${this.formatMove(node.move)}`;
     
     const scoreDisplay = this.showScores 
       ? `<div class="node-score">Score: ${node.score}</div>`
@@ -338,10 +360,10 @@ class TreeVisualizer {
       tooltip = document.createElement('div');
       tooltip.className = 'node-tooltip';
       document.body.appendChild(tooltip);
-r    }
+    }
     
-    const moveInfo = node.column !== null && node.column !== undefined 
-      ? this.formatMove(node.column) 
+    const moveInfo = node.move !== null && node.move !== undefined
+      ? this.formatMove(node.move)
       : 'Root (Current Board State)';
     
     const pvInfo = nodeInfo.isInBestPath 

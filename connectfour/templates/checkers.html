@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checkers Analyst</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  {% set files = ['A','B','C','D','E','F','G','H'] %}
+  <div class="page">
+    <div class="top-bar">
+      <div>
+        <h1>Checkers Analyst</h1>
+        <p class="subtitle">Play full American checkers with forced captures, promotion to kings, and AI search diagnostics.</p>
+      </div>
+      <div class="nav-buttons">
+        <div class="game-switcher">
+          <a href="{{ url_for('play') }}" class="btn secondary">🟡 Connect Four</a>
+          <a href="{{ url_for('tictactoe') }}" class="btn secondary">❌⭕ Tic-Tac-Toe</a>
+          <span class="btn active">♟️ Checkers</span>
+        </div>
+        <a href="{{ url_for('learn') }}" class="btn secondary">📚 Minimax Primer</a>
+      </div>
+    </div>
+
+    {% if message %}
+      <div class="status{% if game_over %} warning{% endif %}">{{ message }}</div>
+    {% endif %}
+
+    <div class="layout">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Play Checkers</h2>
+          <div class="legend">
+            <span><span class="checker-chip human"></span>Human (men / kings)</span>
+            <span><span class="checker-chip ai"></span>AI (men / kings)</span>
+          </div>
+        </div>
+
+        <div class="checkers-wrapper">
+          <div class="checkers-board">
+            {% for r in range(8) %}
+              {% for c in range(8) %}
+                {% set cell = board[r][c] %}
+                {% set dark = (r + c) % 2 == 1 %}
+                {% set is_last_ai = last_ai_move and last_ai_move[0] == r and last_ai_move[1] == c %}
+                <div class="checker-square {{ 'dark' if dark else 'light' }}{% if is_last_ai %} last-move{% endif %}">
+                  {% if cell != 0 %}
+                    {% set owner = 'human' if cell in [1,3] else 'ai' %}
+                    {% set crowned = cell in [3,4] %}
+                    <div class="checker-piece {{ owner }}{% if crowned %} king{% endif %}">
+                      {% if crowned %}K{% endif %}
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% endfor %}
+          </div>
+          <div class="checkers-controls">
+            <div class="status-grid">
+              <div>
+                <div class="label">Turn</div>
+                <div class="value">{{ 'Human' if human_turn else 'AI' }}</div>
+                <div class="pill">Captures are mandatory</div>
+              </div>
+              <div>
+                <div class="label">AI depth</div>
+                <div class="value">{{ ai_depth }} ply</div>
+                <div class="pill">Deeper explores more jumps</div>
+              </div>
+              <div>
+                <div class="label">Game state</div>
+                <div class="value">{% if game_over %}Game over{% else %}In progress{% endif %}</div>
+                <div class="pill">Reset anytime to start fresh</div>
+              </div>
+            </div>
+
+            <div class="controls">
+              <form method="post" class="depth-inline">
+                <input type="hidden" name="action" value="set_depth" />
+                <label for="depth"><strong>Depth</strong> (2-6):</label>
+                <input type="range" id="depth" name="depth" min="2" max="6" value="{{ ai_depth }}" oninput="depthValue.innerText=this.value" />
+                <span id="depthValue" class="pill">{{ ai_depth }}</span>
+                <button class="btn" type="submit">Update</button>
+              </form>
+              <form method="post">
+                <input type="hidden" name="action" value="ai_start" />
+                <button class="btn secondary" type="submit">🤖 Let AI start</button>
+              </form>
+              <a href="{{ url_for('checkers_reset') }}" class="btn secondary">Reset</a>
+              <a href="{{ url_for('checkers_analysis') }}" class="btn secondary">🔍 Insights</a>
+            </div>
+
+            <div class="concept-section">
+              <h3>Available moves</h3>
+              {% if human_turn and human_moves %}
+                <div class="move-grid">
+                  {% for move in human_moves %}
+                    {% set start = move.path[0] %}
+                    {% set end = move.path[-1] %}
+                    {% set capture = move.captures|length > 0 %}
+                    <form method="post" class="move-card">
+                      <input type="hidden" name="action" value="move" />
+                      <input type="hidden" name="move_index" value="{{ loop.index0 }}" />
+                      <div class="move-title">{{ files[start[1]] }}{{ start[0] + 1 }} → {{ files[end[1]] }}{{ end[0] + 1 }}</div>
+                      <div class="subtitle">{{ 'Capture sequence' if capture else 'Simple step' }}{% if move.promotes %} · Promotes{% endif %}</div>
+                      {% if capture %}
+                        <div class="pill">{{ move.captures|length }} piece{{ 's' if move.captures|length > 1 else '' }} taken</div>
+                      {% endif %}
+                      <button class="btn" type="submit">Play move</button>
+                    </form>
+                  {% endfor %}
+                </div>
+              {% elif not human_turn %}
+                <p class="subtitle">Waiting for the AI to complete its move.</p>
+              {% else %}
+                <p class="subtitle">No legal moves available.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% if game_over %}
+          <div class="status warning" style="margin-top:12px;">Game over. Reset or let the AI start a new match.</div>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <h2>Strategy insight</h2>
+        <p class="subtitle">The evaluator tracks material, mobility, and central control. Promotions to kings swing the score heavily.</p>
+        <ul class="list">
+          <li><strong>Material:</strong> Kings are worth more than men; trades that create a king are favored.</li>
+          <li><strong>Mobility:</strong> Every extra legal move adds pressure. Cornered pieces reduce the score.</li>
+          <li><strong>Center:</strong> Occupying the middle squares adds stability and options for forks.</li>
+        </ul>
+        {% if last_diag %}
+          <div class="insight-grid">
+            <div class="stat">
+              <div class="label">Nodes expanded</div>
+              <div class="value">{{ last_diag.nodes_expanded }}</div>
+              <div class="pill">Alpha-beta pruning trims bad lines</div>
+            </div>
+            <div class="stat">
+              <div class="label">Search time</div>
+              <div class="value">{{ '%.3f'|format(last_diag.duration_s) }}s</div>
+              <div class="pill">Depth {{ last_diag.search_depth }} with captures</div>
+            </div>
+            <div class="stat">
+              <div class="label">Principal variation</div>
+              <div class="value">
+                {% for mv in last_diag.principal_variation %}
+                  {% set s = mv.path[0] %}{% set e = mv.path[-1] %}
+                  <span class="pill">{{ files[s[1]] }}{{ s[0] + 1 }}→{{ files[e[1]] }}{{ e[0] + 1 }}</span>
+                {% else %}
+                  —
+                {% endfor %}
+              </div>
+              <div class="pill">Best line assuming perfect play</div>
+            </div>
+          </div>
+        {% else %}
+          <div class="subtitle">Make a move to populate the diagnostics. The AI will show its reasoning immediately.</div>
+        {% endif %}
+        <div class="key-point">
+          <strong>Teaching tip:</strong> Try setting the depth to 2, then 6. The branching factor from captures makes deeper searches grow quickly.
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

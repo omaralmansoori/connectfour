@@ -8,6 +8,7 @@ This project provides a Connect Four experience with shared game logic, a minima
 - **Command-line interface** for quick play sessions.
 - **Tkinter desktop GUI** with a visual board and user input handling.
 - **Flask web app** offering a user-friendly gameplay page and an AI diagnostics page that exposes evaluated moves, search depth, timing, and nodes expanded.
+- **Extra games**: Tic-Tac-Toe and Checkers, each with dedicated play and analysis pages powered by the shared minimax engine.
 - **Logging** of AI inference metrics to `connectfour.log`.
 
 ## Installation
@@ -29,6 +30,8 @@ This project provides a Connect Four experience with shared game logic, a minima
 - `connectfour/cli.py`: CLI entry point for playing in the terminal.
 - `connectfour/gui.py`: Tkinter GUI launcher.
 - `connectfour/app.py`: Flask application factory and routes for gameplay and diagnostics.
+- `connectfour/tictactoe.py`: Tic-Tac-Toe game implementation and evaluator used by the shared AI.
+- `connectfour/checkers.py`: Checkers rules, move generator, and heuristic evaluator for the new game mode.
 
 ## Usage
 ### Command Line
@@ -58,6 +61,9 @@ python -m connectfour.app
 - Visit `http://localhost:8000/diagnostics` to see the latest AI reasoning: evaluated moves, search depth, timing, and nodes expanded.
 - Use `http://localhost:8000/reset` to start a fresh game.
 - Configure AI depth via `CONNECTFOUR_DEPTH` environment variable.
+- Additional games:
+  - Checkers: `http://localhost:8000/checkers` with insights at `/checkers/analysis`
+  - Tic-Tac-Toe: `http://localhost:8000/tictactoe` with analysis at `/tictactoe/analysis`
 
 ## Logging
 All interfaces log AI inference metrics (move chosen, duration, depth, and nodes expanded) to the log file configured in `GameConfig` (defaults to `connectfour.log`).

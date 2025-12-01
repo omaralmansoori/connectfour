@@ -122,7 +122,7 @@
           <div class="move-list">
             {% for move in diag.evaluated_moves %}
               <div class="move-item">
-                <span class="move-col">Cell ({{ (move.column // 3) + 1 }}, {{ (move.column % 3) + 1 }})</span>
+                <span class="move-col">Cell ({{ (move.move // 3) + 1 }}, {{ (move.move % 3) + 1 }})</span>
                 <span class="move-score" data-score="{{ move.score }}">Score: {{ move.score }}</span>
               </div>
             {% endfor %}

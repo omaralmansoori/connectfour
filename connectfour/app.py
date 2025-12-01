@@ -8,6 +8,7 @@ from flask import Flask, redirect, render_template, request, url_for
 
 from .ai import MinimaxAI, SearchDiagnostics
 from .board import Board, Player
+from .checkers import CheckersBoard, evaluate_checkers
 from .config import GameConfig
 from .tictactoe import TicTacToeBoard, evaluate_tictactoe
 
@@ -35,6 +36,13 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
     app.config["ttt_diagnostics"] = None
     app.config["ttt_last_ai_move"] = None
     app.config["ttt_diagnostics_history"] = []  # Store history for tic-tac-toe too
+    app.config["checkers_board"] = CheckersBoard()
+    app.config["checkers_ai_depth"] = 4
+    app.config["checkers_ai"] = MinimaxAI(depth=4, evaluator=evaluate_checkers)
+    app.config["checkers_turn"] = Player.HUMAN
+    app.config["checkers_diagnostics"] = None
+    app.config["checkers_last_ai_move"] = None
+    app.config["checkers_diagnostics_history"] = []
 
     @app.route("/")
     def root() -> str:
@@ -333,6 +341,164 @@ def create_app(config: Optional[GameConfig] = None) -> Flask:
         app.config["ttt_last_ai_move"] = None
         app.config["ttt_diagnostics_history"] = []  # Clear history on reset
         return redirect(url_for("tictactoe"))
+
+    @app.route("/checkers", methods=["GET", "POST"])
+    def checkers():
+        board: CheckersBoard = app.config["checkers_board"]
+        ai: MinimaxAI = app.config["checkers_ai"]
+        last_diag: Optional[SearchDiagnostics] = app.config.get("checkers_diagnostics")
+        turn: Player = app.config["checkers_turn"]
+
+        over, winner = board.game_over()
+        message = "Draw!" if over and winner is None else f"{winner.name} wins!" if winner else ""
+
+        if request.method == "POST":
+            action = request.form.get("action", "move")
+
+            if action == "set_depth":
+                try:
+                    new_depth = int(request.form.get("depth", ai.depth))
+                except ValueError:
+                    message = "Depth must be a number between 2 and 6"
+                else:
+                    new_depth = max(2, min(6, new_depth))
+                    app.config["checkers_ai_depth"] = new_depth
+                    app.config["checkers_ai"] = MinimaxAI(depth=new_depth, evaluator=evaluate_checkers)
+                    ai = app.config["checkers_ai"]
+                    app.config["checkers_diagnostics"] = None
+                    app.config["checkers_diagnostics_history"] = []
+                    message = "Updated Checkers AI depth. Higher depth explores more jumps and trades."
+            elif action == "ai_start":
+                if not board.is_initial() or turn != Player.HUMAN:
+                    message = "Game already in progress"
+                else:
+                    move, diagnostics = ai.choose_move(board, Player.AI)
+                    result_ai = board.drop_piece(move, Player.AI)
+                    if result_ai:
+                        app.config["checkers_last_ai_move"] = (result_ai.row, result_ai.col)
+                    app.config["checkers_diagnostics"] = diagnostics
+                    move_num = len(app.config["checkers_diagnostics_history"]) + 1
+                    app.config["checkers_diagnostics_history"].append(
+                        {
+                            "move_num": move_num,
+                            "ai_move": move,
+                            "diagnostics": diagnostics,
+                            "board_snapshot": [row[:] for row in board.grid],
+                        }
+                    )
+                    last_diag = diagnostics
+                    turn = Player.HUMAN
+                    app.config["checkers_turn"] = Player.HUMAN
+                    logger.info(
+                        "Checkers AI start move",
+                        extra={
+                            "move": move,
+                            "duration_s": diagnostics.duration_s,
+                            "depth": diagnostics.search_depth,
+                            "nodes": diagnostics.nodes_expanded,
+                        },
+                    )
+                    over, winner = board.game_over()
+                    if over:
+                        message = "Draw!" if winner is None else f"{winner.name} wins!"
+            elif action == "move" and not over and turn == Player.HUMAN:
+                valid_moves = board.valid_moves(Player.HUMAN)
+                try:
+                    move_idx = int(request.form.get("move_index", "-1"))
+                except ValueError:
+                    message = "Select a move to play."
+                else:
+                    if move_idx < 0 or move_idx >= len(valid_moves):
+                        message = "That move is no longer available."
+                    else:
+                        move = valid_moves[move_idx]
+                        app.config["checkers_last_ai_move"] = None
+                        board.drop_piece(move, Player.HUMAN)
+                        app.config["checkers_turn"] = Player.AI
+                        over, winner = board.game_over()
+                        if over:
+                            message = "Draw!" if winner is None else f"{winner.name} wins!"
+                        else:
+                            ai_move, diagnostics = ai.choose_move(board, Player.AI)
+                            result_ai = board.drop_piece(ai_move, Player.AI)
+                            if result_ai:
+                                app.config["checkers_last_ai_move"] = (result_ai.row, result_ai.col)
+                            app.config["checkers_diagnostics"] = diagnostics
+                            move_num = len(app.config["checkers_diagnostics_history"]) + 1
+                            app.config["checkers_diagnostics_history"].append(
+                                {
+                                    "move_num": move_num,
+                                    "ai_move": ai_move,
+                                    "diagnostics": diagnostics,
+                                    "board_snapshot": [row[:] for row in board.grid],
+                                }
+                            )
+                            last_diag = diagnostics
+                            app.config["checkers_turn"] = Player.HUMAN
+                            logger.info(
+                                "Checkers AI move",
+                                extra={
+                                    "move": ai_move,
+                                    "duration_s": diagnostics.duration_s,
+                                    "depth": diagnostics.search_depth,
+                                    "nodes": diagnostics.nodes_expanded,
+                                },
+                            )
+                            over, winner = board.game_over()
+                            if over:
+                                message = "Draw!" if winner is None else f"{winner.name} wins!"
+
+        human_moves = board.valid_moves(Player.HUMAN)
+        return render_template(
+            "checkers.html",
+            board=board.grid,
+            human_moves=human_moves,
+            message=message,
+            game_over=over,
+            last_diag=last_diag,
+            ai_depth=app.config["checkers_ai_depth"],
+            turn=app.config["checkers_turn"],
+            human_turn=app.config["checkers_turn"] == Player.HUMAN,
+            last_ai_move=app.config.get("checkers_last_ai_move"),
+        )
+
+    @app.route("/checkers/analysis")
+    def checkers_analysis():
+        history = app.config.get("checkers_diagnostics_history", [])
+        board: CheckersBoard = app.config["checkers_board"]
+
+        selected_move = request.args.get("move", type=int)
+
+        if history:
+            if selected_move is None or selected_move < 1 or selected_move > len(history):
+                selected_move = len(history)
+
+            selected_entry = history[selected_move - 1]
+            diag = selected_entry["diagnostics"]
+            board_snapshot = selected_entry["board_snapshot"]
+        else:
+            diag = app.config.get("checkers_diagnostics")
+            board_snapshot = board.grid
+            selected_move = None
+
+        return render_template(
+            "checkers_analysis.html",
+            diag=diag,
+            board=board_snapshot,
+            history=history,
+            selected_move=selected_move,
+            total_moves=len(history),
+        )
+
+    @app.route("/checkers/reset")
+    def checkers_reset():
+        board: CheckersBoard = app.config["checkers_board"]
+        board.reset()
+        app.config["checkers_turn"] = Player.HUMAN
+        app.config["checkers_diagnostics"] = None
+        app.config["checkers_last_ai_move"] = None
+        app.config["checkers_diagnostics_history"] = []
+        return redirect(url_for("checkers"))
 
     @app.route("/reset")
     def reset():
