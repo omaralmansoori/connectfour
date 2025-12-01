@@ -3,149 +3,227 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Checkers Insights</title>
+  <title>Checkers Analysis</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='tree.css') }}" />
 </head>
 <body>
   {% set files = ['A','B','C','D','E','F','G','H'] %}
   <div class="page">
-    <h1>AI Search Analysis - Checkers</h1>
-    <p class="subtitle">Review how the checkers AI weighs captures, promotions, and mobility using minimax with alpha-beta pruning.</p>
-    <p><a href="{{ url_for('checkers') }}">← Back to game</a></p>
+    <!-- Header -->
+    <div class="analysis-header">
+      <div class="header-content">
+        <a href="{{ url_for('checkers') }}" class="back-link">
+          <span class="back-icon">←</span>
+          <span>Back to Game</span>
+        </a>
+        <h1>📊 AI Analysis</h1>
+        <p class="subtitle">See how the AI evaluates positions using minimax with alpha-beta pruning</p>
+      </div>
+    </div>
 
-    {% if history and history|length > 0 %}
-      <div class="panel" style="margin-bottom: 20px;">
-        <h2>🕐 Move History</h2>
-        <p class="subtitle">Inspect any AI move from the match and compare its root evaluations.</p>
-        <div class="move-history-nav">
-          <div class="history-controls">
-            {% if selected_move > 1 %}
-              <a href="{{ url_for('checkers_analysis', move=1) }}" class="history-btn" title="First move">⏮</a>
-              <a href="{{ url_for('checkers_analysis', move=selected_move - 1) }}" class="history-btn" title="Previous move">◀</a>
-            {% else %}
-              <span class="history-btn disabled">⏮</span>
-              <span class="history-btn disabled">◀</span>
-            {% endif %}
+    {% if not diag and not history %}
+      <!-- Empty State -->
+      <div class="empty-state">
+        <div class="empty-icon">🎮</div>
+        <h2>No moves to analyze yet</h2>
+        <p>Play some moves against the AI to see its decision-making process here.</p>
+        <a href="{{ url_for('checkers') }}" class="btn">Start Playing</a>
+      </div>
+    {% else %}
+      <!-- Move Navigator -->
+      {% if history and history|length > 0 %}
+      <div class="move-navigator">
+        <div class="nav-controls">
+          {% if selected_move > 1 %}
+            <a href="{{ url_for('checkers_analysis', move=1) }}" class="nav-btn" title="First move">⏮️</a>
+            <a href="{{ url_for('checkers_analysis', move=selected_move - 1) }}" class="nav-btn" title="Previous">◀️</a>
+          {% else %}
+            <span class="nav-btn disabled">⏮️</span>
+            <span class="nav-btn disabled">◀️</span>
+          {% endif %}
 
-            <div class="history-selector">
-              <select id="moveSelector" onchange="window.location.href='{{ url_for('checkers_analysis') }}?move=' + this.value">
-                {% for entry in history %}
-                  {% set mv = entry.ai_move %}
-                  {% set s = mv.path[0] %}{% set e = mv.path[-1] %}
-                  <option value="{{ entry.move_num }}" {% if entry.move_num == selected_move %}selected{% endif %}>
-                    AI Move #{{ entry.move_num }} → {{ files[s[1]] }}{{ s[0] + 1 }}→{{ files[e[1]] }}{{ e[0] + 1 }}
-                  </option>
+          <div class="move-dropdown">
+            <select id="moveSelector" onchange="window.location.href='{{ url_for('checkers_analysis') }}?move=' + this.value">
+              {% for entry in history %}
+                {% set mv = entry.ai_move %}
+                {% set s = mv.path[0] %}{% set e = mv.path[-1] %}
+                <option value="{{ entry.move_num }}" {% if entry.move_num == selected_move %}selected{% endif %}>
+                  Move #{{ entry.move_num }}: {{ files[s[1]] }}{{ s[0] + 1 }} → {{ files[e[1]] }}{{ e[0] + 1 }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if selected_move < total_moves %}
+            <a href="{{ url_for('checkers_analysis', move=selected_move + 1) }}" class="nav-btn" title="Next">▶️</a>
+            <a href="{{ url_for('checkers_analysis', move=total_moves) }}" class="nav-btn" title="Latest">⏭️</a>
+          {% else %}
+            <span class="nav-btn disabled">▶️</span>
+            <span class="nav-btn disabled">⏭️</span>
+          {% endif %}
+        </div>
+        <div class="nav-info">
+          Move <strong>{{ selected_move }}</strong> of <strong>{{ total_moves }}</strong>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Analysis Layout -->
+      <div class="analysis-layout">
+        <!-- Board State -->
+        <div class="analysis-board-section">
+          <div class="section-card">
+            <h2>🎯 Board Position</h2>
+            <p class="card-subtitle">After AI Move #{{ selected_move or 'N/A' }}</p>
+            
+            <div class="analysis-board-container">
+              <div class="analysis-board">
+                {% for r in range(8) %}
+                  {% for c in range(8) %}
+                    {% set cell = board[r][c] %}
+                    {% set dark = (r + c) % 2 == 1 %}
+                    <div class="analysis-cell {{ 'dark' if dark else 'light' }}">
+                      {% if cell != 0 %}
+                        {% set owner = 'human' if cell in [1,3] else 'ai' %}
+                        {% set crowned = cell in [3,4] %}
+                        <div class="analysis-piece {{ owner }}{% if crowned %} king{% endif %}">
+                          {% if crowned %}♔{% endif %}
+                        </div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
                 {% endfor %}
-              </select>
-            </div>
-
-            {% if selected_move < total_moves %}
-              <a href="{{ url_for('checkers_analysis', move=selected_move + 1) }}" class="history-btn" title="Next move">▶</a>
-              <a href="{{ url_for('checkers_analysis', move=total_moves) }}" class="history-btn" title="Latest move">⏭</a>
-            {% else %}
-              <span class="history-btn disabled">▶</span>
-              <span class="history-btn disabled">⏭</span>
-            {% endif %}
-          </div>
-          <div class="history-info">
-            Viewing move <strong>{{ selected_move }}</strong> of <strong>{{ total_moves }}</strong>
-          </div>
-        </div>
-      </div>
-    {% endif %}
-
-    <div class="panel" style="margin-bottom: 20px;">
-      <h2>Board State {% if selected_move %}(After AI Move #{{ selected_move }}){% endif %}</h2>
-      <div class="checkers-board mini">
-        {% for r in range(8) %}
-          {% for c in range(8) %}
-            {% set cell = board[r][c] %}
-            {% set dark = (r + c) % 2 == 1 %}
-            <div class="checker-square {{ 'dark' if dark else 'light' }}">
-              {% if cell != 0 %}
-                {% set owner = 'human' if cell in [1,3] else 'ai' %}
-                {% set crowned = cell in [3,4] %}
-                <div class="checker-piece {{ owner }}{% if crowned %} king{% endif %}">{% if crowned %}K{% endif %}</div>
-              {% endif %}
-            </div>
-          {% endfor %}
-        {% endfor %}
-      </div>
-
-      {% if diag %}
-      <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-        <div>
-          <h3>Search Metrics</h3>
-          <div class="metrics">
-            <div class="metric-item">
-              <span class="metric-label">Search Depth:</span>
-              <span class="metric-value">{{ diag.search_depth }} ply</span>
-            </div>
-            <div class="metric-item">
-              <span class="metric-label">Duration:</span>
-              <span class="metric-value">{{ '%.3f'|format(diag.duration_s) }}s</span>
-            </div>
-            <div class="metric-item">
-              <span class="metric-label">Nodes Expanded:</span>
-              <span class="metric-value">{{ diag.nodes_expanded }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h3>Root Move Evaluations</h3>
-          <div class="move-list">
-            {% for move in diag.evaluated_moves %}
-              {% set s = move.move.path[0] %}{% set e = move.move.path[-1] %}
-              <div class="move-item">
-                <span class="move-col">{{ files[s[1]] }}{{ s[0] + 1 }}→{{ files[e[1]] }}{{ e[0] + 1 }}</span>
-                <span class="move-score" data-score="{{ move.score }}">Score: {{ move.score }}</span>
               </div>
-            {% endfor %}
+            </div>
+
+            <div class="board-legend">
+              <span class="legend-item"><span class="legend-dot human"></span>You</span>
+              <span class="legend-item"><span class="legend-dot ai"></span>AI</span>
+              <span class="legend-item"><span class="legend-dot king"></span>King</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics & Moves -->
+        <div class="analysis-details-section">
+          {% if diag %}
+          <!-- Search Metrics -->
+          <div class="section-card">
+            <h2>⚡ Search Metrics</h2>
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-icon">🌳</div>
+                <div class="metric-data">
+                  <span class="metric-number">{{ diag.search_depth }}</span>
+                  <span class="metric-label">Search Depth</span>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon">⏱️</div>
+                <div class="metric-data">
+                  <span class="metric-number">{{ '%.3f'|format(diag.duration_s) }}s</span>
+                  <span class="metric-label">Think Time</span>
+                </div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-icon">🔍</div>
+                <div class="metric-data">
+                  <span class="metric-number">{{ diag.nodes_expanded|default(0) }}</span>
+                  <span class="metric-label">Positions Analyzed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Evaluated Moves -->
+          <div class="section-card">
+            <h2>📊 Move Rankings</h2>
+            <p class="card-subtitle">How the AI scored each available move</p>
+            <div class="evaluated-moves">
+              {% for move in diag.evaluated_moves %}
+                {% set s = move.move.path[0] %}{% set e = move.move.path[-1] %}
+                {% set is_best = loop.first %}
+                <div class="eval-move {% if is_best %}best{% endif %}">
+                  <div class="eval-move-info">
+                    {% if is_best %}<span class="best-badge">✓ Chosen</span>{% endif %}
+                    <span class="eval-notation">{{ files[s[1]] }}{{ s[0] + 1 }} → {{ files[e[1]] }}{{ e[0] + 1 }}</span>
+                  </div>
+                  <div class="eval-score {% if move.score > 0 %}positive{% elif move.score < 0 %}negative{% endif %}">
+                    {{ '%+.1f'|format(move.score) if move.score is number else move.score }}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Legend -->
+          <div class="section-card">
+            <h2>📖 Understanding Scores</h2>
+            <div class="score-legend">
+              <div class="score-item positive">
+                <span class="score-indicator">+</span>
+                <span>Favors AI (higher = better for AI)</span>
+              </div>
+              <div class="score-item negative">
+                <span class="score-indicator">−</span>
+                <span>Favors Human (lower = better for you)</span>
+              </div>
+              <div class="score-item neutral">
+                <span class="score-indicator">0</span>
+                <span>Equal position</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style="margin-top: 16px;">
-        <h3>Legend</h3>
-        <div class="tree-legend">
-          <div class="legend-item">
-            <span class="legend-box ai-node"></span>
-            <span>AI Move (Maximizing)</span>
-          </div>
-          <div class="legend-item">
-            <span class="legend-box human-node"></span>
-            <span>Human Move (Minimizing)</span>
-          </div>
-          <div class="legend-item">
-            <span class="legend-box best-path"></span>
-            <span>Principal Variation (Best Path)</span>
-          </div>
-        </div>
-      </div>
-      {% endif %}
-    </div>
-
-    <div class="panel tree-panel">
-      <h2>Minimax Search Tree</h2>
+      <!-- Search Tree Section -->
       {% if diag %}
-        <div class="tree-controls">
-          <label>
-            <input type="checkbox" id="showBestOnly" checked /> Show Best Path Only
-          </label>
-          <label>
-            <input type="checkbox" id="showScores" checked /> Show Scores
-          </label>
-          <label>
-            <input type="checkbox" id="highlightBest" checked /> Highlight Best Path
-          </label>
+      <div class="tree-section">
+        <div class="section-card full-width">
+          <div class="tree-header">
+            <div>
+              <h2>🌲 Decision Tree</h2>
+              <p class="card-subtitle">Visual representation of the minimax search</p>
+            </div>
+            <div class="tree-controls">
+              <label class="tree-toggle">
+                <input type="checkbox" id="showBestOnly" checked />
+                <span>Best Path Only</span>
+              </label>
+              <label class="tree-toggle">
+                <input type="checkbox" id="showScores" checked />
+                <span>Show Scores</span>
+              </label>
+              <label class="tree-toggle">
+                <input type="checkbox" id="highlightBest" checked />
+                <span>Highlight Best</span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="tree-legend-bar">
+            <div class="tree-legend-item">
+              <span class="legend-box ai"></span>
+              <span>AI Move (Max)</span>
+            </div>
+            <div class="tree-legend-item">
+              <span class="legend-box human"></span>
+              <span>Human Move (Min)</span>
+            </div>
+            <div class="tree-legend-item">
+              <span class="legend-box best"></span>
+              <span>Best Path</span>
+            </div>
+          </div>
+          
+          <div id="treeContainer" class="tree-container"></div>
         </div>
-        <div id="treeContainer"></div>
-      {% else %}
-        <p class="subtitle">No search tree available. Play a move first to see the AI's decision tree.</p>
+      </div>
       {% endif %}
-    </div>
+    {% endif %}
   </div>
 
   {% if diag %}
